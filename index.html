@@ -1151,28 +1151,78 @@ function showAdminPanel(){
 }
 
 // ---- 系统数据导入 ----
+function normDate(v){
+  v=String(v).trim();
+  var m=v.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(m) return m[1]+"-"+String(+m[2]).padStart(2,"0")+"-"+String(+m[3]).padStart(2,"0");
+  if(/^\d{5}(\.\d+)?$/.test(v)){ var n=Number(v); if(n>20000&&n<80000){ var dt=new Date(Math.round((n-25569)*86400000)); return dt.getUTCFullYear()+"-"+String(dt.getUTCMonth()+1).padStart(2,"0")+"-"+String(dt.getUTCDate()).padStart(2,"0"); } }
+  return null;
+}
+// 列顺序无关：自动识别 日期列 / 班组列 / 两个数值列(不记产,模糊)
+function parseSysRow(cells){
+  var teamName=null, date=null, nums=[];
+  for(var i=0;i<cells.length;i++){
+    var raw=cells[i]; if(raw==null) continue; var v=String(raw).trim(); if(v==="") continue;
+    if(!date){ var d=normDate(v); if(d){ date=d; continue; } }
+    var n=Number(v); var isNum=(v!=="" && !isNaN(n));
+    if(isNum) nums.push(n);
+    else if(!teamName) teamName=v;
+  }
+  if(!teamName||!date||nums.length<2) return null;
+  return {teamName:teamName, date:date, bujichan:nums[0], mohu:nums[1]};
+}
+function loadXLSXLib(cb){
+  if(window.XLSX) return cb(true);
+  var urls=["https://registry.npmmirror.com/xlsx/0.18.5/files/dist/xlsx.full.min.js","https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"];
+  var i=0;
+  (function next(){ if(i>=urls.length){ cb(!!window.XLSX); return; } var s=document.createElement('script'); s.src=urls[i]; s.onload=function(){ cb(!!window.XLSX); }; s.onerror=function(){ i++; next(); }; document.head.appendChild(s); })();
+}
+function onSysFilePicked(input){
+  var f=input.files && input.files[0]; if(!f) return;
+  var st=document.getElementById('sys-import-status'); if(st){ st.className='settings-status success'; st.textContent='正在解析文件...'; }
+  loadXLSXLib(function(ok){
+    if(!ok){ if(st){ st.className='settings-status error'; st.textContent='Excel解析库加载失败。请改用复制粘贴：打开该xlsx→选中数据区域→Ctrl+C→粘贴到下方文本框。'; } return; }
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+        var parsed=[]; var skipped=0;
+        rows.forEach(function(r){ var o=parseSysRow(r); if(o) parsed.push(o); else if(r && r.some(function(x){return String(x).trim()!=="";})) skipped++; });
+        if(!parsed.length){ if(st){ st.className='settings-status error'; st.textContent='未从文件识别到有效数据（需含 日期 / 班组 / 两个数值列）'; } return; }
+        document.getElementById('sys-import-text').value=parsed.map(function(x){ return [x.teamName,x.date,x.bujichan,x.mohu].join(','); }).join('\n');
+        if(st){ st.className='settings-status success'; st.textContent='已解析 '+parsed.length+' 条'+(skipped?('（忽略 '+skipped+' 行表头/空行）'):'')+'，请核对后点“保存到云端”。'; }
+      }catch(err){ if(st){ st.className='settings-status error'; st.textContent='解析失败：'+err.message; } }
+    };
+    reader.onerror=function(){ if(st){ st.className='settings-status error'; st.textContent='读取文件失败'; } };
+    reader.readAsArrayBuffer(f);
+  });
+}
 function showSysImport(){
   var c=document.getElementById('cloud-data-content'); if(!c) return;
   fetchBin(SYSDATA_URL,0,function(ok,rec){
     var list=(rec&&rec.sysdata)||[]; sysDataCache=list;
     var cur=list.map(function(x){ return [x.teamName,x.date,x.bujichan,x.mohu].join(','); }).join('\n');
     var h='<div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:8px">导入系统数据（后台）</div>';
-    h+='<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.7">每行一条：<code style="background:#F3F4F6;padding:1px 6px;border-radius:4px">班组,日期,不记产系统数据,模糊系统数据</code>。同班组+日期会覆盖旧值。可从 MES 导出后粘贴到此处。</div>';
-    h+='<textarea id="sys-import-text" class="settings-textarea" placeholder="一部一课,2026-09-10,120,86">'+esc(cur)+'</textarea>';
+    h+='<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.7">方式一：直接选择 MES 导出的 <b>xlsx 模板</b>（列：日期 / 班组 / 不记产工时-系统数据 / 模糊工时-系统数据，列顺序可自动识别，自动跳过表头）。<br/>方式二：打开 xlsx 选中数据区复制后粘贴到下方文本框（每行 <code style="background:#F3F4F6;padding:1px 6px;border-radius:4px">日期, 班组, 不记产, 模糊</code>，逗号或Tab分隔均可）。同班组+日期会覆盖旧值。</div>';
+    h+='<div style="margin-bottom:10px"><label style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1.5px solid #4F46E5;background:#EEF2FF;color:#4F46E5;font-size:13px;font-weight:600;cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>选择 xlsx 文件</label><input type="file" id="sys-file-input" accept=".xlsx,.xls" style="display:none"/></div>';
+    h+='<textarea id="sys-import-text" class="settings-textarea" placeholder="2026-09-11,一部一课,110,72">'+esc(cur)+'</textarea>';
     h+='<div id="sys-import-status" class="settings-status"></div>';
     h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px"><button data-action="backToCloudData" style="padding:10px 24px;border-radius:10px;border:1.5px solid #D1D5DB;background:#fff;color:#374151;font-size:14px;font-weight:600;cursor:pointer">返回</button><button class="settings-btn-save" data-action="importSysData" style="padding:10px 24px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer">保存到云端</button></div>';
     c.innerHTML=h;
+    var fi=document.getElementById('sys-file-input');
+    if(fi) fi.addEventListener('change', function(){ onSysFilePicked(this); });
   });
 }
 function importSysData(){
   var ta=document.getElementById('sys-import-text'); var st=document.getElementById('sys-import-status'); if(!ta) return;
   var lines=ta.value.split(/\r?\n/); var out=[]; var bad=[];
-  lines.forEach(function(ln){ ln=ln.trim(); if(!ln) return; var p=ln.split(/[,，]/); if(p.length<4){ bad.push(ln); return; } out.push({ teamName:p[0].trim(), date:p[1].trim(), bujichan:Number(p[2])||0, mohu:Number(p[3])||0 }); });
-  if(bad.length){ st.className='settings-status error'; st.textContent='有 '+bad.length+' 行格式不正确（需4列，逗号分隔）'; return; }
-  if(!out.length){ st.className='settings-status error'; st.textContent='没有可保存的数据'; return; }
+  lines.forEach(function(ln){ ln=ln.trim(); if(!ln) return; var cells=ln.split(/[\t,，]/); var o=parseSysRow(cells); if(o) out.push(o); else bad.push(ln); });
+  if(!out.length){ st.className='settings-status error'; st.textContent='没有可保存的数据（每行需含 日期、班组、两个数值）'; return; }
   st.className='settings-status success'; st.textContent='正在保存...';
   var xhr=new XMLHttpRequest(); xhr.open('PUT', SYSDATA_URL, true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr.timeout=15000;
-  xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ st.className='settings-status success'; st.textContent='已保存 '+out.length+' 条系统数据'; sysDataCache=out; } else { st.className='settings-status error'; st.textContent='保存失败 HTTP '+xhr.status; } };
+  xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ st.className='settings-status success'; st.textContent='已保存 '+out.length+' 条系统数据'+(bad.length?('（忽略 '+bad.length+' 行）'):''); sysDataCache=out; } else { st.className='settings-status error'; st.textContent='保存失败 HTTP '+xhr.status; } };
   xhr.onerror=function(){ st.className='settings-status error'; st.textContent='保存失败：网络错误'; };
   xhr.send(JSON.stringify({sysdata:out}));
 }
