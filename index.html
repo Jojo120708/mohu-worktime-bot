@@ -407,6 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
       case 'goNext': goNext(); break;
       case 'addCard': addCard(btn.getAttribute('data-section')); break;
       case 'delCard': delCard(btn.getAttribute('data-section'), Number(btn.getAttribute('data-idx'))); break;
+      case 'toggleSel': toggleSel(btn.getAttribute('data-section')); break;
       case 'submitInterview': submitInterview(); break;
       case 'goBackToMissing': goBackToMissing(); break;
       case 'toggleDetail': toggleDetail(btn.getAttribute('data-param')); break;
@@ -595,12 +596,14 @@ function uploadRecordToCloud(record){
 }
 
 // ==================== INTERVIEW FLOW ====================
-// steps: 0班组 1日期 2系统数据 3不记产明细 4品质返工明细 5标时不达成明细 6完成
-var TOTAL_STEPS = 7;
-function stepTitle(s){ return ["选择班组","选择日期","系统数据","不记产工时明细","品质返工明细","标时不达成明细","提交"][s]; }
+// steps: 0班组 1日期 2系统数据 3选择原因类型(多选) 4填写明细(统一) 5完成
+var TOTAL_STEPS = 6;
+var SEL_LABELS = { bujichanList:"不记产工时", pinzhiList:"品质返工", biaoshiList:"标时不达成" };
+function stepTitle(s){ return ["选择班组","选择日期","系统数据","选择原因类型","填写明细","提交"][s]; }
+function selectedSections(){ return SECTION_ORDER.filter(function(sec){ return answers.sel && answers.sel[sec]; }); }
 
 function startInterview(){
-  currentStep=0; answers={ teamName:"", date:"", sysBujichan:null, sysMohu:null, sysLoaded:false, bujichanList:[], pinzhiList:[], biaoshiList:[] };
+  currentStep=0; answers={ teamName:"", date:"", sysBujichan:null, sysMohu:null, sysLoaded:false, sel:{ bujichanList:false, pinzhiList:false, biaoshiList:false }, bujichanList:[], pinzhiList:[], biaoshiList:[] };
   isSubmitted=false;
   document.getElementById("welcome").classList.add("hidden");
   document.getElementById("dashboard").classList.add("hidden");
@@ -611,7 +614,6 @@ function startInterview(){
 function renderInterview(){
   document.getElementById("progress-fill").style.width = (((currentStep+1)/TOTAL_STEPS)*100)+"%";
   document.getElementById("interview-sub").textContent = "第 "+(currentStep+1)+" 步 / 共 "+TOTAL_STEPS+" 步 · "+stepTitle(currentStep);
-  // chat history
   var ch=document.getElementById("chat-history"); ch.innerHTML="";
   if (answers.teamName){ ch.innerHTML+=bubble("q","请选择班组")+bubble("a",answers.teamName); }
   if (answers.date){ ch.innerHTML+=bubble("q","这是哪一天的数据？")+bubble("a",answers.date); }
@@ -619,17 +621,20 @@ function renderInterview(){
     ch.innerHTML+=bubble("q","系统数据（后台导入）");
     ch.innerHTML+=bubble("a", answers.sysLoaded ? ("不记产 "+fmtNum(answers.sysBujichan)+"h · 模糊 "+fmtNum(answers.sysMohu)+"h") : "未导入");
   }
-  if (currentStep>=3){ ch.innerHTML+=bubble("q","不记产工时明细")+bubble("a",(answers.bujichanList.length)+" 条 · 合计 "+fmtNum(secTotal('bujichanList'))+"h"); }
-  if (currentStep>=4){ ch.innerHTML+=bubble("q","品质返工明细")+bubble("a",(answers.pinzhiList.length)+" 条 · 合计 "+fmtNum(secTotal('pinzhiList'))+"h"); }
-  if (currentStep>=5){ ch.innerHTML+=bubble("q","标时不达成明细")+bubble("a",(answers.biaoshiList.length)+" 条 · 合计 "+fmtNum(secTotal('biaoshiList'))+"h"); }
+  if (currentStep>=3){
+    var sel=selectedSections();
+    ch.innerHTML+=bubble("q","本次涉及的原因类型")+bubble("a", sel.length? sel.map(function(s){return SEL_LABELS[s];}).join("、") : "未选择");
+  }
+  if (currentStep>=4){
+    selectedSections().forEach(function(sec){ ch.innerHTML+=bubble("q",SECTION_DEFS[sec].title)+bubble("a",(answers[sec].length)+" 条 · 合计 "+fmtNum(secTotal(sec))+"h"); });
+  }
 
   var card=document.getElementById("question-card");
   if (currentStep===0) renderTeamStep(card);
   else if (currentStep===1) renderDateStep(card);
   else if (currentStep===2) renderSysStep(card);
-  else if (currentStep===3) renderListStep(card,'bujichanList');
-  else if (currentStep===4) renderListStep(card,'pinzhiList');
-  else if (currentStep===5) renderListStep(card,'biaoshiList');
+  else if (currentStep===3) renderSelectStep(card);
+  else if (currentStep===4) renderDetailsStep(card);
   else renderCompletion(card);
 
   setTimeout(function(){ var c=document.getElementById("question-card"); if(c) c.scrollIntoView({behavior:'smooth',block:'end'}); },100);
@@ -658,7 +663,7 @@ function renderSysStep(card){
   var html='<div class="question-header"><div class="question-icon info">'+iconInfo()+'</div><span class="question-label">系统数据（后台导入）</span></div>';
   if (!answers.sysLoaded){
     html+='<div style="padding:14px 16px;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#991B1B;font-size:14px;line-height:1.7">';
-    html+='未找到 <strong>'+esc(answers.teamName)+'</strong> '+esc(answers.date)+' 的系统数据。<br/>请管理员在“云端数据 → 管理 → 导入系统数据”中导入后，再重新进入采访。';
+    html+='未找到 <strong>'+esc(answers.teamName)+'</strong> '+esc(answers.date)+' 的系统数据。<br/>请管理员在“云端数据 → 导入系统数据”中导入后，再重新进入采访。';
     html+='</div>';
   } else {
     html+='<div class="analysis-grid">';
@@ -671,28 +676,59 @@ function renderSysStep(card){
   renderNavButtons();
 }
 
-function renderListStep(card, section){
-  var def=SECTION_DEFS[section];
-  var covLabel, cov, needCard;
-  if (section==='bujichanList'){ cov=bujichanCoverage(); needCard=sysBujichan()>0; covLabel='不记产覆盖率'; }
-  else { cov=mohuCoverage(); needCard=sysMohu()>0; covLabel='模糊覆盖率'; }
-  var covColor2=covColor(cov);
-
-  var html='<div class="question-header"><div class="question-icon warning">'+iconList()+'</div><span class="question-label">'+def.title+'</span></div>';
-  html+='<div style="font-size:12px;color:#9CA3AF;margin:-10px 0 14px">'+def.desc+'</div>';
-
-  // coverage bar (only meaningful when system data loaded)
+function renderSelectStep(card){
+  var html='<div class="question-header"><div class="question-icon warning">'+iconList()+'</div><span class="question-label">请选择本次涉及的原因类型（可多选）</span></div>';
+  html+='<div style="font-size:12px;color:#9CA3AF;margin:-10px 0 14px">勾选后在下一步统一填写对应明细</div>';
+  html+='<div class="reason-grid" style="display:flex;flex-wrap:wrap;gap:10px">';
+  SECTION_ORDER.forEach(function(sec){
+    var def=SECTION_DEFS[sec]; var on=answers.sel[sec];
+    var req = (sec==='bujichanList' && sysBujichan()>0) || (sec!=='bujichanList' && sysMohu()>0);
+    html+='<button class="reason-btn'+(on?' selected':'')+'" style="'+(on?'--reason-color:'+def.color+';border-color:'+def.color+';background:'+def.color+'15;color:'+def.color+';font-weight:600;':'')+'" data-action="toggleSel" data-section="'+sec+'">'+(on?'☑':'☐')+' '+SEL_LABELS[sec]+(req?' <span style="font-size:11px;color:#DC2626">*必</span>':'')+'</button>';
+  });
+  html+='</div>';
   if (answers.sysLoaded){
-    html+='<div class="coverage-bar-wrap"><div class="coverage-text" style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:13px;color:#6B7280">'+covLabel+'（需≥95%）</span><span style="font-size:13px;font-weight:700;color:'+covColor2+'">'+fmtNum(section==='bujichanList'?secTotal('bujichanList'):mohuTotal())+' / '+fmtNum(section==='bujichanList'?sysBujichan():sysMohu())+' h ('+cov.toFixed(0)+'%)</span></div><div class="coverage-bar"><div class="coverage-bar-fill" style="width:'+Math.min(cov,100)+'%;background:'+covColor2+'"></div></div></div>';
+    html+='<div style="font-size:12px;color:#9CA3AF;margin-top:14px">带 *必 的类型由系统数据决定（不记产系统>0 必选不记产；模糊系统>0 至少选品质返工或标时不达成）</div>';
+  }
+  html+='<div id="nav-container"></div>';
+  card.innerHTML=html;
+  renderNavButtons();
+}
+function toggleSel(section){ saveFieldValues(); answers.sel[section]=!answers.sel[section]; renderInterview(); }
+
+function renderDetailsStep(card){
+  var sel=selectedSections();
+  var html='<div class="question-header"><div class="question-icon warning">'+iconList()+'</div><span class="question-label">填写明细</span></div>';
+  if (answers.sysLoaded){
+    html+=covBarWrapHtml('cov-bjc','不记产覆盖率', secTotal('bujichanList'), sysBujichan(), bujichanCoverage());
+    html+=covBarWrapHtml('cov-mohu','模糊覆盖率', mohuTotal(), sysMohu(), mohuCoverage());
   } else {
     html+='<div style="padding:10px 14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;font-size:12px;color:#92400E;margin-bottom:12px">系统数据未导入，覆盖率暂无法计算。可先填写明细，提交前需管理员导入系统数据。</div>';
   }
-
-  html+='<div style="--sec-color:'+def.color+'">';
-  var list=answers[section]||[];
-  if (list.length===0){
-    html+='<div style="text-align:center;color:#9CA3AF;font-size:13px;padding:16px 0">点击下方按钮添加明细条目</div>';
+  if (!sel.length){
+    html+='<div style="text-align:center;color:#9CA3AF;font-size:13px;padding:16px 0">未选择原因类型，请返回上一步勾选。</div>';
   }
+  sel.forEach(function(sec){ html+=sectionBlockHtml(sec); });
+  html+='<div id="validation-msg"></div>';
+  html+='<div id="nav-container"></div>';
+  card.innerHTML=html;
+  card.querySelectorAll('.field-input').forEach(function(inp){ inp.addEventListener('input', function(){ onFieldInput(this); }); });
+  renderNavButtons();
+  updateValidationMsg();
+}
+function covBarWrapHtml(id,label,num,den,cov){
+  var c=covColor(cov);
+  return '<div class="coverage-bar-wrap" id="'+id+'">'+covBarInner(label,num,den,cov,c)+'</div>';
+}
+function covBarInner(label,num,den,cov,c){
+  return '<div class="coverage-text" style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:13px;color:#6B7280">'+label+'（需≥95%）</span><span style="font-size:13px;font-weight:700;color:'+c+'">'+fmtNum(num)+' / '+fmtNum(den)+' h ('+cov.toFixed(0)+'%)</span></div><div class="coverage-bar"><div class="coverage-bar-fill" style="width:'+Math.min(cov,100)+'%;background:'+c+'"></div></div>';
+}
+function sectionBlockHtml(section){
+  var def=SECTION_DEFS[section];
+  var html='<div style="--sec-color:'+def.color+';margin-bottom:18px;padding-top:6px;border-top:2px solid '+def.color+'22">';
+  html+='<div style="font-size:14px;font-weight:700;color:'+def.color+';margin:8px 0 2px">'+def.title+'</div>';
+  html+='<div style="font-size:12px;color:#9CA3AF;margin-bottom:12px">'+def.desc+'</div>';
+  var list=answers[section]||[];
+  if (list.length===0){ html+='<div style="text-align:center;color:#9CA3AF;font-size:13px;padding:10px 0">点击下方按钮添加明细条目</div>'; }
   list.forEach(function(item, idx){
     html+='<div class="detail-card" style="border:1px solid '+def.color+'30;background:'+def.color+'08">';
     html+='<div class="detail-card-head"><span class="detail-card-title" style="color:'+def.color+'">条目 '+(idx+1)+'</span>';
@@ -706,40 +742,25 @@ function renderListStep(card, section){
     });
     html+='</div>';
   });
-  html+='<button class="btn-add-card" data-action="addCard" data-section="'+section+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> 添加一条'+def.title.replace('明细','')+'</button>';
+  html+='<button class="btn-add-card" data-action="addCard" data-section="'+section+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> 添加一条'+SEL_LABELS[section]+'</button>';
   html+='</div>';
-  html+='<div id="validation-msg"></div>';
-  html+='<div id="nav-container"></div>';
-  card.innerHTML=html;
-
-  // input listeners (delegation on card)
-  card.querySelectorAll('.field-input').forEach(function(inp){
-    inp.addEventListener('input', function(){ onFieldInput(this); });
-  });
-  renderNavButtons();
-  updateValidationMsg();
+  return html;
 }
 
 function onFieldInput(el){
   var section=el.getAttribute('data-section'); var idx=Number(el.getAttribute('data-idx')); var field=el.getAttribute('data-field'); var type=el.getAttribute('data-type');
   var item=answers[section][idx]; if(!item) return;
   item[field] = type==='num' ? (el.value===""?"":Number(el.value)) : el.value;
-  // patch computed hours for this card
   var calcEl=document.getElementById('calc-'+section+'-'+idx);
   if (calcEl) calcEl.textContent = fmtNum(SECTION_DEFS[section].calc(item));
-  // patch coverage bar
-  patchCoverage(section);
+  updateCoverageBars();
   renderNavButtons();
   updateValidationMsg();
 }
-function patchCoverage(section){
+function updateCoverageBars(){
   if (!answers.sysLoaded) return;
-  var wrap=document.querySelector('.coverage-bar-wrap'); if(!wrap) return;
-  var cov, num, den, label;
-  if (section==='bujichanList'){ cov=bujichanCoverage(); num=secTotal('bujichanList'); den=sysBujichan(); label='不记产覆盖率（需≥95%）'; }
-  else { cov=mohuCoverage(); num=mohuTotal(); den=sysMohu(); label='模糊覆盖率（需≥95%）'; }
-  var c=covColor(cov);
-  wrap.innerHTML='<div class="coverage-text" style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:13px;color:#6B7280">'+label+'</span><span style="font-size:13px;font-weight:700;color:'+c+'">'+fmtNum(num)+' / '+fmtNum(den)+' h ('+cov.toFixed(0)+'%)</span></div><div class="coverage-bar"><div class="coverage-bar-fill" style="width:'+Math.min(cov,100)+'%;background:'+c+'"></div></div>';
+  var e1=document.getElementById('cov-bjc'); if(e1){ var c1=bujichanCoverage(); e1.innerHTML=covBarInner('不记产覆盖率', secTotal('bujichanList'), sysBujichan(), c1, covColor(c1)); }
+  var e2=document.getElementById('cov-mohu'); if(e2){ var c2=mohuCoverage(); e2.innerHTML=covBarInner('模糊覆盖率', mohuTotal(), sysMohu(), c2, covColor(c2)); }
 }
 
 function addCard(section){
@@ -777,15 +798,16 @@ function sectionCardsValid(section){
   return true;
 }
 function updateValidationMsg(){
-  if (currentStep<3||currentStep>5) return;
-  var section=SECTION_ORDER[currentStep-3];
+  if (currentStep!==4) return;
   var el=document.getElementById('validation-msg'); if(!el) return;
   saveFieldValues();
-  var list=answers[section]||[]; var incomplete=[];
-  list.forEach(function(item,i){ var m=cardMissing(section,item); if(m.length) incomplete.push({i:i,m:m}); });
+  var incomplete=[];
+  selectedSections().forEach(function(sec){
+    (answers[sec]||[]).forEach(function(item,i){ var m=cardMissing(sec,item); if(m.length) incomplete.push({label:SEL_LABELS[sec],i:i,m:m}); });
+  });
   if (incomplete.length){
     var h='<div style="margin-top:10px;padding:10px 14px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:10px;font-size:12px;color:#92400E"><div style="font-weight:600;margin-bottom:4px">以下条目信息不完整：</div>';
-    incomplete.forEach(function(x){ h+='<div style="margin-top:2px">• 条目 '+(x.i+1)+'：还需填写 '+x.m.join('、')+'</div>'; });
+    incomplete.forEach(function(x){ h+='<div style="margin-top:2px">• '+x.label+' 条目 '+(x.i+1)+'：还需填写 '+x.m.join('、')+'</div>'; });
     el.innerHTML=h+'</div>';
   } else el.innerHTML='';
 }
@@ -793,10 +815,12 @@ function updateValidationMsg(){
 function canProceed(){
   if (currentStep===0) return !!answers.teamName;
   if (currentStep===1) return !!answers.date;
-  if (currentStep===2) return true; // 允许在无系统数据时继续填明细
-  if (currentStep>=3 && currentStep<=5){
-    var section=SECTION_ORDER[currentStep-3];
-    return sectionCardsValid(section);
+  if (currentStep===2) return true;
+  if (currentStep===3) return selectedSections().length>0;
+  if (currentStep===4){
+    var sel=selectedSections();
+    for (var i=0;i<sel.length;i++){ var sec=sel[i]; if((answers[sec]||[]).length===0) return false; if(!sectionCardsValid(sec)) return false; }
+    return true;
   }
   return true;
 }
@@ -804,17 +828,14 @@ function renderNavButtons(){
   var nav=document.getElementById("nav-container"); if(!nav) return;
   var html='<div class="nav-buttons"><button class="btn-nav btn-prev"'+(currentStep===0?' disabled':'')+' data-action="goPrev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> 上一步</button>';
   if (currentStep===TOTAL_STEPS-1){ nav.innerHTML=''; return; }
-  var nextLabel = currentStep===5 ? '下一步（完成）' : '下一步';
+  var nextLabel = currentStep===4 ? '下一步（完成）' : '下一步';
   html+='<button class="btn-nav btn-next primary"'+(canProceed()?'':' disabled')+' data-action="goNext">'+nextLabel+' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>';
   html+='</div>';
   nav.innerHTML=html;
 }
 function goNext(){
   saveFieldValues();
-  if (currentStep===1){
-    // entering sys step: load system data
-    currentStep=2; renderInterview(); loadSysIntoAnswers(); return;
-  }
+  if (currentStep===1){ currentStep=2; renderInterview(); loadSysIntoAnswers(); return; }
   if (currentStep<TOTAL_STEPS-1){ currentStep++; renderInterview(); }
 }
 function goPrev(){ if(currentStep>0){ saveFieldValues(); currentStep--; renderInterview(); } }
@@ -823,14 +844,18 @@ function loadSysIntoAnswers(){
   loadSysData(tn, dt, function(ok, found){
     if (ok && found){ answers.sysLoaded=true; answers.sysBujichan=Number(found.bujichan)||0; answers.sysMohu=Number(found.mohu)||0; }
     else { answers.sysLoaded=false; answers.sysBujichan=null; answers.sysMohu=null; }
+    // 依据系统数据预勾选原因类型
+    answers.sel = { bujichanList: sysBujichan()>0, pinzhiList: sysMohu()>0, biaoshiList: sysMohu()>0 };
     if (currentStep===2) renderInterview();
   });
 }
 function goBackToMissing(){
   if (!answers.teamName){ currentStep=0; renderInterview(); return; }
   if (!answers.date){ currentStep=1; renderInterview(); return; }
-  for (var i=0;i<3;i++){ var sec=SECTION_ORDER[i]; if(!sectionCardsValid(sec)){ currentStep=3+i; renderInterview(); return; } }
-  currentStep=6; renderInterview();
+  if (selectedSections().length===0){ currentStep=3; renderInterview(); return; }
+  var bad=false; selectedSections().forEach(function(sec){ if((answers[sec]||[]).length===0 || !sectionCardsValid(sec)) bad=true; });
+  if (bad){ currentStep=4; renderInterview(); return; }
+  currentStep=5; renderInterview();
 }
 
 // ==================== COMPLETION / SUBMIT ====================
@@ -879,6 +904,7 @@ function submitInterview(){
   var exist=records.find(function(r){ return r.teamName===answers.teamName && r.date===answers.date; });
   if (exist && !confirm("该班组今日已有记录，新数据将覆盖，是否继续？")) return;
   isSubmitted=true;
+  SECTION_ORDER.forEach(function(sec){ if(!(answers.sel && answers.sel[sec])) answers[sec]=[]; });
   var record={
     id: Date.now(), submitTime: nowStr(),
     teamName: answers.teamName, date: answers.date,
