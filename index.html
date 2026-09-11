@@ -1067,6 +1067,17 @@ function sysTeamsForView(){
   inView.forEach(function(s){ if((Number(s.bujichan)||0)>0 || (Number(s.mohu)||0)>0){ if(!seen[s.teamName]){ seen[s.teamName]=true; order.push(s.teamName); } } });
   return order;
 }
+function sysTotalsForView(){
+  var inView = sysDataAll.filter(function(s){
+    if(!s || !s.date) return false;
+    if(dashboardTimeFilter==='day') return s.date===dashboardDateFilter;
+    if(dashboardTimeFilter==='week') return getISOWeek(s.date)===dashboardDateFilter;
+    return getMonthKey(s.date)===dashboardDateFilter;
+  });
+  var b=0,m=0;
+  inView.forEach(function(s){ b+=Number(s.bujichan)||0; m+=Number(s.mohu)||0; });
+  return {bujichan:b, mohu:m};
+}
 function renderDashboard(){
   var data=aggregate(cloudDashboardRecords, dashboardTimeFilter);
   data.sort(function(a,b){ var ai=TEAM_SORT.indexOf(a.teamName),bi=TEAM_SORT.indexOf(b.teamName); if(ai<0)ai=99; if(bi<0)bi=99; if(ai!==bi) return ai-bi; return (a.date||"").localeCompare(b.date||""); });
@@ -1078,7 +1089,8 @@ function renderDashboard(){
 
   var totSysB=0,totB=0,totSysM=0,totM=0,totPZ=0,totBS=0,totOT=0,needFix=0;
   data.forEach(function(r){ totSysB+=r.sysBujichan||0; totB+=r.bujichanTotal||0; totSysM+=r.sysMohu||0; totM+=r.mohuTotal||0; totPZ+=r.pinzhiTotal||0; totBS+=r.biaoshiTotal||0; totOT+=r.otherTotal||0; if((r.sysBujichan>0&&r.bujichanCoverage<95)||(r.sysMohu>0&&r.mohuCoverage<95)) needFix++; });
-  var avgB=totSysB>0?totB/totSysB*100:100, avgM=totSysM>0?totM/totSysM*100:100;
+  var sysT=sysTotalsForView();
+  var avgB=sysT.bujichan>0?totB/sysT.bujichan*100:100, avgM=sysT.mohu>0?totM/sysT.mohu*100:100;
   var submittedSet={}; data.forEach(function(r){ submittedSet[(r.label||r.teamName)]=true; });
   var expectedTeams = sysTeamsForView();
   var unsubmitted = expectedTeams.filter(function(t){ return !submittedSet[t]; });
@@ -1086,11 +1098,10 @@ function renderDashboard(){
 
   var html='<div class="kpi-grid">';
   html+=kpiCard('#EEF2FF','#4F46E5',iconTeam(),(dashboardTimeFilter==='day'?'班组数量':'时段数量'),data.length,'');
-  html+=kpiCard('#FEF3C7','#D97706',iconClock(),'不记产覆盖率',avgB.toFixed(0)+'%','明细 '+fmtNum(totB)+'h / 系统 '+fmtNum(totSysB)+'h');
-  html+=kpiCard('#F5F3FF','#7C3AED',iconClock(),'模糊覆盖率',avgM.toFixed(0)+'%','明细 '+fmtNum(totM)+'h / 系统 '+fmtNum(totSysM)+'h');
+  html+=kpiCard('#FEF3C7','#D97706',iconClock(),'不记产覆盖率',avgB.toFixed(0)+'%','明细 '+fmtNum(totB)+'h / 系统 '+fmtNum(sysT.bujichan)+'h');
+  html+=kpiCard('#F5F3FF','#7C3AED',iconClock(),'模糊覆盖率',avgM.toFixed(0)+'%','明细 '+fmtNum(totM)+'h / 系统 '+fmtNum(sysT.mohu)+'h');
   html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','品质返工 '+fmtNum(totPZ)+'h · 标时不达成 '+fmtNum(totBS)+'h · 其他 '+fmtNum(totOT)+'h');
   html+=kpiCard('#FEF2F2','#EF4444',iconWarn(),'未提交班组',unsubmitted.length,'应提交 '+expectedTeams.length+' 个');
-  html+=kpiCard('#FFFBEB','#D97706',iconWarn(),'待补(未达95%)',needFixTeams.length,'需补充明细的班组');
   html+='</div>';
 
   html+='<div class="table-card" style="margin-bottom:16px;padding:16px 22px"><div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:12px">提交状态提醒'+(dashboardTimeFilter==='day'?(' · '+formatDateShort(dashboardDateFilter)):(dashboardTimeFilter==='week'?(' · '+getWeekDateRange(dashboardDateFilter)):(' · '+getMonthLabel(dashboardDateFilter))))+'</div>';
