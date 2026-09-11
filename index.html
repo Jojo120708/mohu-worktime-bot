@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="format-detection" content="telephone=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<title>班组模糊工时采访系统</title>
+<!-- 钉钉 JSAPI SDK -->
+<script src="https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.25/dingtalk.open.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #f5f5f5; }
+.hidden { display: none !important; }
+
+/* Welcome Page */
+#welcome { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #EEF2FF 0%, #F9FAFB 50%, #ECFDF5 100%); padding: 24px; }
+.welcome-card { background: #fff; border-radius: 24px; padding: 56px 48px; max-width: 520px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.08); text-align: center; }
+.welcome-icon { width: 80px; height: 80px; border-radius: 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); display: flex; align-items: center; justify-content: center; margin: 0 auto 28px; }
+.welcome-icon svg { width: 40px; height: 40px; }
+.welcome-card h1 { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 12px; }
+.welcome-card p { font-size: 16px; color: #6B7280; line-height: 1.7; margin-bottom: 36px; }
+.feature-tags { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 36px; }
+.feature-tag { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 12px; background: #F9FAFB; border: 1px solid #E5E7EB; font-size: 14px; color: #374151; font-weight: 500; }
+.feature-tag svg { width: 18px; height: 18px; }
+.btn-primary { background: linear-gradient(135deg, #4F46E5, #7C3AED); color: #fff; border: none; border-radius: 14px; padding: 14px 40px; font-size: 16px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(79,70,229,0.35); transition: transform 0.15s, box-shadow 0.15s; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,70,229,0.45); }
+.btn-primary svg { width: 18px; height: 18px; }
+.btn-link { background: none; border: none; color: #4F46E5; font-size: 14px; cursor: pointer; font-weight: 500; margin-top: 20px; }
+
+/* Interview Page */
+#interview { min-height: 100vh; background: #F3F4F6; display: flex; justify-content: center; padding: 32px 16px; }
+.interview-container { max-width: 640px; width: 100%; }
+.interview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.interview-header-left { display: flex; align-items: center; gap: 12px; }
+.interview-header-icon { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, #4F46E5, #7C3AED); display: flex; align-items: center; justify-content: center; }
+.interview-header-icon svg { width: 20px; height: 20px; }
+.interview-header-title { font-weight: 700; font-size: 18px; color: #111827; }
+.interview-header-sub { font-size: 13px; color: #9CA3AF; }
+.btn-exit { background: none; border: 1px solid #D1D5DB; border-radius: 8px; padding: 6px 14px; font-size: 13px; color: #6B7280; cursor: pointer; }
+.progress-bar { height: 4px; background: #E5E7EB; border-radius: 2px; margin-bottom: 28px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #4F46E5, #7C3AED); border-radius: 2px; transition: width 0.4s ease; }
+
+/* Chat Messages */
+.chat-history { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+.chat-msg { display: flex; }
+.chat-msg.question { justify-content: flex-end; }
+.chat-msg.answer { justify-content: flex-start; }
+.chat-bubble { padding: 10px 16px; border-radius: 16px; max-width: 80%; font-size: 14px; }
+.chat-msg.question .chat-bubble { background: #4F46E5; color: #fff; border-radius: 16px 16px 4px 16px; font-weight: 500; box-shadow: 0 1px 3px rgba(79,70,229,0.2); }
+.chat-msg.answer .chat-bubble { background: #fff; color: #374151; border-radius: 16px 16px 16px 4px; border: 1px solid #E5E7EB; }
+
+/* Question Card */
+.question-card { background: #fff; border-radius: 20px; padding: 28px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #E5E7EB; }
+.question-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.question-icon { width: 36px; height: 36px; border-radius: 10px; background: #EEF2FF; display: flex; align-items: center; justify-content: center; }
+.question-icon svg { width: 18px; height: 18px; }
+.question-icon.warning { background: #FEF3C7; }
+.question-icon.warning svg { color: #D97706; }
+.question-icon.danger { background: #FEE2E2; }
+.question-icon.danger svg { color: #DC2626; }
+.question-icon.info { background: #ECFDF5; }
+.question-icon.info svg { color: #059669; }
+.question-label { font-size: 16px; font-weight: 600; color: #111827; }
+.question-input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1.5px solid #E5E7EB; font-size: 15px; outline: none; box-sizing: border-box; background: #FAFAFA; transition: border-color 0.2s, background 0.2s; }
+.question-input:focus { border-color: #4F46E5; background: #fff; }
+
+/* Detail card (list section) */
+.detail-card { border-radius: 14px; padding: 16px; margin-bottom: 14px; position: relative; }
+.detail-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.detail-card-title { font-size: 14px; font-weight: 700; }
+.detail-card-del { margin-left: auto; background: none; border: 1px solid #DC2626; color: #DC2626; border-radius: 8px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.detail-card-del:disabled { border-color: #E5E7EB; color: #D1D5DB; cursor: not-allowed; }
+.field-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.field-label { font-size: 13px; color: #6B7280; min-width: 96px; }
+.field-input { flex: 1; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #E5E7EB; font-size: 14px; outline: none; box-sizing: border-box; background: #FAFAFA; }
+.field-input:focus { border-color: var(--sec-color); background: #fff; }
+.field-calc { font-size: 13px; font-weight: 700; }
+.btn-add-card { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: 10px; border: 1.5px dashed #D1D5DB; background: #fff; cursor: pointer; font-size: 14px; color: #6B7280; margin-top: 6px; transition: all 0.15s; }
+.btn-add-card:hover { border-color: var(--sec-color); color: var(--sec-color); }
+
+/* Completion */
+.completion { text-align: center; padding: 12px 0; }
+.completion-icon { width: 56px; height: 56px; border-radius: 50%; background: #ECFDF5; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+.completion-icon svg { width: 28px; height: 28px; color: #10B981; }
+.completion h3 { font-size: 18px; font-weight: 700; color: #111827; margin-bottom: 8px; }
+.completion p { font-size: 14px; color: #6B7280; margin-bottom: 4px; }
+.btn-submit { background: linear-gradient(135deg, #10B981, #059669); color: #fff; border: none; border-radius: 12px; padding: 12px 32px; font-size: 15px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(16,185,129,0.3); }
+.btn-submit svg { width: 18px; height: 18px; }
+
+/* Navigation */
+.nav-buttons { display: flex; justify-content: space-between; margin-top: 24px; }
+.btn-nav { display: flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 10px; font-size: 14px; cursor: pointer; transition: all 0.15s; }
+.btn-nav:disabled { cursor: not-allowed; }
+.btn-prev { border: 1px solid #D1D5DB; background: #fff; color: #374151; }
+.btn-prev:disabled { color: #D1D5DB; }
+.btn-next { border: none; background: #4F46E5; color: #fff; font-weight: 500; }
+.btn-next:disabled { background: #E5E7EB; color: #9CA3AF; }
+.btn-next.primary { background: linear-gradient(135deg, #4F46E5, #7C3AED); font-weight: 600; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
+.btn-next.primary:disabled { background: #E5E7EB; color: #9CA3AF; box-shadow: none; }
+.btn-nav svg { width: 16px; height: 16px; }
+
+/* Dashboard */
+#dashboard { min-height: 100vh; background: #F3F4F6; }
+.dashboard-header { background: #fff; border-bottom: 1px solid #E5E7EB; padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; flex-wrap: wrap; gap: 10px; }
+.dashboard-header-left { display: flex; align-items: center; gap: 12px; }
+.dashboard-header-icon { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #4F46E5, #7C3AED); display: flex; align-items: center; justify-content: center; }
+.dashboard-header-icon svg { width: 18px; height: 18px; }
+.dashboard-header-title { font-weight: 700; font-size: 17px; color: #111827; }
+.dashboard-header-sub { font-size: 13px; color: #6B7280; margin-top: 2px; }
+.dashboard-header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.time-filter-toggle { display: flex; border-radius: 14px; background: #F3F4F6; gap: 6px; padding: 5px; border: none; }
+.time-filter-btn { padding: 8px 18px; border: 2px solid transparent; border-radius: 10px; background: transparent; font-size: 14px; color: #6B7280; cursor: pointer; transition: all 0.2s; font-weight: 600; }
+.time-filter-btn[data-param="day"].active { background: #2563EB; color: #fff; border-color: #1D4ED8; box-shadow: 0 3px 10px rgba(37,99,235,0.4); }
+.time-filter-btn[data-param="week"].active { background: #7C3AED; color: #fff; border-color: #6D28D9; box-shadow: 0 3px 10px rgba(124,58,237,0.4); }
+.time-filter-btn[data-param="month"].active { background: #059669; color: #fff; border-color: #047857; box-shadow: 0 3px 10px rgba(5,150,105,0.4); }
+.date-picker-wrap { display: flex; align-items: center; gap: 8px; margin-left: 8px; }
+.date-picker-wrap label { font-size: 13px; color: #6B7280; font-weight: 500; white-space: nowrap; }
+.date-picker-input { padding: 8px 12px; border: 1.5px solid #D1D5DB; border-radius: 8px; font-size: 14px; color: #374151; background: #fff; outline: none; }
+.date-picker-input:focus { border-color: #4F46E5; }
+.btn-add { display: flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 10px; border: none; background: linear-gradient(135deg, #4F46E5, #7C3AED); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(79,70,229,0.25); }
+.btn-add svg { width: 15px; height: 15px; }
+.btn-home { padding: 8px 14px; border-radius: 10px; border: 1px solid #D1D5DB; background: #fff; font-size: 13px; color: #6B7280; cursor: pointer; }
+.btn-export { display: flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 10px; border: none; background: linear-gradient(135deg, #059669, #10B981); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(5,150,105,0.25); }
+.btn-export svg { width: 15px; height: 15px; }
+.btn-ghost { display: flex; align-items: center; gap: 5px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid #10B981; background: #ECFDF5; font-size: 13px; color: #059669; font-weight: 600; cursor: pointer; }
+.btn-ghost svg { width: 14px; height: 14px; }
+.btn-warn { display: flex; align-items: center; gap: 5px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid #F59E0B; background: #FFFBEB; font-size: 13px; color: #D97706; font-weight: 600; cursor: pointer; }
+.btn-warn svg { width: 14px; height: 14px; }
+.dashboard-content { padding: 24px 28px; max-width: 1200px; margin: 0 auto; }
+
+/* KPI Cards */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.kpi-card { background: #fff; border-radius: 16px; padding: 20px 22px; border: 1px solid #E5E7EB; }
+.kpi-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.kpi-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.kpi-icon svg { width: 18px; height: 18px; }
+.kpi-label { font-size: 13px; color: #6B7280; }
+.kpi-value { font-size: 26px; font-weight: 700; color: #111827; }
+.kpi-sub { font-size: 12px; color: #9CA3AF; margin-top: 4px; }
+
+/* Chart Cards */
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.chart-card { background: #fff; border-radius: 16px; padding: 20px 22px; border: 1px solid #E5E7EB; }
+.chart-card h3 { font-size: 15px; font-weight: 600; color: #111827; margin-bottom: 16px; margin-top: 0; }
+.chart-container { width: 100%; height: 260px; }
+.chart-container canvas { width: 100% !important; height: 100% !important; }
+
+/* Data Table */
+.table-card { background: #fff; border-radius: 16px; border: 1px solid #E5E7EB; overflow: hidden; }
+.table-header { padding: 16px 22px; border-bottom: 1px solid #E5E7EB; display: flex; align-items: center; }
+.table-header h3 { font-size: 15px; font-weight: 600; color: #111827; margin: 0; }
+.table-header span { font-size: 12px; color: #9CA3AF; margin-left: 8px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 10px 14px; text-align: left; font-weight: 600; color: #6B7280; border-bottom: 1px solid #E5E7EB; white-space: nowrap; background: #F9FAFB; }
+td { padding: 12px 14px; border-bottom: 1px solid #F3F4F6; }
+.status-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.btn-detail { background: none; border: 1px solid #E5E7EB; border-radius: 6px; padding: 3px 8px; font-size: 12px; color: #6B7280; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.btn-detail svg { width: 12px; height: 12px; }
+.detail-row td { padding: 0 14px 14px; background: #FAFAFA; }
+.detail-content { padding: 12px 16px; background: #fff; border-radius: 10px; border: 1px solid #E5E7EB; margin-top: 4px; }
+.detail-content-title { font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 10px; }
+
+/* Analysis Display */
+.analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.analysis-item { padding: 12px 14px; background: #F9FAFB; border-radius: 10px; border: 1px solid #E5E7EB; }
+.analysis-item.warn { background: #FEF2F2; border-color: #FECACA; }
+.analysis-item.ok { background: #ECFDF5; border-color: #A7F3D0; }
+.analysis-item-label { font-size: 12px; color: #6B7280; margin-bottom: 4px; }
+.analysis-item-value { font-size: 18px; font-weight: 700; }
+.analysis-item-sub { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+.coverage-bar-wrap { margin-bottom: 16px; }
+.coverage-bar { height: 8px; background: #E5E7EB; border-radius: 4px; overflow: hidden; }
+.coverage-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.coverage-text { font-size: 13px; margin-top: 6px; }
+
+/* Settings Modal */
+.settings-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.settings-modal { background: #fff; border-radius: 20px; padding: 28px; max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+.settings-modal h3 { font-size: 18px; font-weight: 700; color: #111827; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.settings-section { margin-bottom: 20px; }
+.settings-section-title { font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.settings-section-desc { font-size: 12px; color: #9CA3AF; margin-bottom: 10px; line-height: 1.6; }
+.settings-input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #E5E7EB; font-size: 14px; outline: none; background: #FAFAFA; transition: border-color 0.2s; box-sizing: border-box; }
+.settings-input:focus { border-color: #4F46E5; background: #fff; }
+.settings-textarea { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #E5E7EB; font-size: 13px; outline: none; background: #FAFAFA; box-sizing: border-box; font-family: monospace; resize: vertical; min-height: 140px; }
+.settings-btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+.settings-btn { padding: 10px 24px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+.settings-btn-cancel { background: #F3F4F6; color: #6B7280; }
+.settings-btn-save { background: linear-gradient(135deg, #4F46E5, #7C3AED); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
+.settings-btn-test { background: linear-gradient(135deg, #059669, #10B981); color: #fff; box-shadow: 0 2px 8px rgba(5,150,105,0.3); }
+.settings-status { font-size: 12px; margin-top: 8px; padding: 8px 12px; border-radius: 8px; display: none; }
+.settings-status.success { display: block; background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+.settings-status.error { display: block; background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+.settings-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.settings-badge.on { background: #ECFDF5; color: #059669; }
+.settings-badge.off { background: #FEF2F2; color: #EF4444; }
+.dingtalk-env-badge { display: none; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 8px; background: #EFF6FF; color: #2563EB; font-size: 11px; font-weight: 600; }
+.dingtalk-env-badge svg { width: 14px; height: 14px; }
+
+@media screen and (max-width: 768px) {
+  .welcome-card { padding: 36px 24px; border-radius: 20px; }
+  .welcome-card h1 { font-size: 22px; }
+  .btn-primary { padding: 12px 28px; font-size: 15px; width: 100%; justify-content: center; }
+  .interview-container { max-width: 100%; padding: 0 4px; }
+  .question-card { padding: 20px 16px; border-radius: 16px; }
+  .question-input { font-size: 16px; padding: 14px 16px; }
+  .chat-bubble { max-width: 90%; font-size: 14px; }
+  .nav-buttons { gap: 10px; }
+  .btn-nav { padding: 12px 16px; font-size: 14px; flex: 1; justify-content: center; }
+  .dashboard-header { padding: 12px 16px; }
+  .dashboard-content { padding: 16px; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .kpi-card { padding: 14px 12px; }
+  .kpi-value { font-size: 20px; }
+  .chart-grid { grid-template-columns: 1fr; gap: 12px; }
+  .chart-card { padding: 16px; }
+  .chart-container { height: 220px; }
+  table { font-size: 12px; }
+  th, td { padding: 8px 10px; }
+  .analysis-grid { grid-template-columns: 1fr; }
+  .field-input { padding: 12px 14px; font-size: 16px; }
+  .field-label { min-width: 84px; }
+  .btn-submit { width: 100%; justify-content: center; padding: 14px 24px; }
+  .btn-add { width: 100%; justify-content: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- Welcome Page -->
+<div id="welcome">
+  <div class="welcome-card">
+    <div class="welcome-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </div>
+    <h1>班组模糊工时采访系统</h1>
+    <div class="feature-tags">
+      <div class="feature-tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        对话式采集
+      </div>
+      <div class="feature-tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        实时看板
+      </div>
+      <div class="feature-tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        覆盖率追踪
+      </div>
+    </div>
+    <button class="btn-primary" data-action="startInterview">
+      <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      开始采访
+    </button>
+    <br/>
+    <button class="btn-link" data-action="showDashboard">查看数据看板 →</button>
+  </div>
+</div>
+
+<!-- Interview Page -->
+<div id="interview" class="hidden">
+  <div class="interview-container">
+    <div class="interview-header">
+      <div class="interview-header-left">
+        <div class="interview-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div>
+          <div class="interview-header-title">采访进行中</div>
+          <div class="interview-header-sub" id="interview-sub">第 1 题 / 共 7 步</div>
+        </div>
+      </div>
+      <button class="btn-exit" data-action="showWelcome">退出</button>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width: 14%"></div>
+    </div>
+    <div class="chat-history" id="chat-history"></div>
+    <div class="question-card" id="question-card"></div>
+  </div>
+</div>
+
+<!-- Dashboard Page -->
+<div id="dashboard" class="hidden">
+  <div class="dashboard-header">
+    <div class="dashboard-header-left">
+      <div class="dashboard-header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      </div>
+      <div>
+        <div class="dashboard-header-title">班组模糊工时看板</div>
+        <div class="dashboard-header-sub" id="dashboard-sub">实时数据</div>
+      </div>
+    </div>
+    <div class="dashboard-header-actions">
+      <div class="time-filter-toggle">
+        <button class="time-filter-btn" data-action="setTimeFilter" data-param="day">按日</button>
+        <button class="time-filter-btn" data-action="setTimeFilter" data-param="week">按周</button>
+        <button class="time-filter-btn" data-action="setTimeFilter" data-param="month">按月</button>
+      </div>
+      <div class="date-picker-wrap" id="date-picker-wrap"></div>
+      <button class="btn-add" data-action="startInterview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        新增采访
+      </button>
+      <button class="btn-ghost" data-action="showCloudData">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+        云端数据
+      </button>
+      <button class="btn-warn" data-action="showSettings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        设置
+      </button>
+      <button class="btn-home" data-action="showWelcome">返回首页</button>
+    </div>
+  </div>
+  <div class="dashboard-content" id="dashboard-content"></div>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+var JSONBIN_API_KEY = "$2a$10$kGOwsMptKbVPCmtGDvNK8OEzXj.SmYHX.HPy5hLdpIN8yYjKRpYmS";
+var RECORDS_BIN_ID = "6aa35e7bac6210605abed9b3";   // 模糊工时采集记录
+var SYSDATA_BIN_ID = "6aa35e7dac6210605abed9b4";   // 系统数据（不记产/模糊），后台导入
+var RECORDS_URL = "https://api.jsonbin.io/v3/b/" + RECORDS_BIN_ID;
+var SYSDATA_URL = "https://api.jsonbin.io/v3/b/" + SYSDATA_BIN_ID;
+var ADMIN_PASSWORD = "minth2026";
+var STORAGE_KEY = "mohu_worktime_records";
+var PENDING_KEY = "mohuPendingCloudUploads";
+var WEBHOOK_KEY = "mohu_webhook";
+
+var TEAM_OPTIONS = ["一部一课","一部二课","一部三课","二部一课","二部二课","二部三课","二部四课","二部五课","三部一课"];
+var TEAM_SORT = ["一部一课","一部二课","一部三课","二部一课","二部二课","二部三课","二部四课","二部五课","三部一课"];
+
+// 三个明细区块定义
+var SECTION_DEFS = {
+  bujichanList: {
+    title: "不记产工时明细", color: "#F59E0B",
+    desc: "逐条填写：姓名 / 岗位 / 工作内容 / 工时",
+    fields: [
+      { k: "name", l: "姓名", t: "text" },
+      { k: "position", l: "岗位", t: "text" },
+      { k: "content", l: "工作内容", t: "text" },
+      { k: "hours", l: "工时(小时)", t: "num" }
+    ],
+    calc: function(d){ return Number(d.hours) || 0; }
+  },
+  pinzhiList: {
+    title: "品质返工明细", color: "#06B6D4",
+    desc: "品质返工工时 = 人数 × 每人工时",
+    fields: [
+      { k: "model", l: "产品型号", t: "text" },
+      { k: "people", l: "人数", t: "num" },
+      { k: "hoursPerPerson", l: "每人工时(小时)", t: "num" },
+      { k: "note", l: "原因备注", t: "text" }
+    ],
+    calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
+  },
+  biaoshiList: {
+    title: "标时不达成明细", color: "#8B5CF6",
+    desc: "影响合计工时 = 实际标时×实际人数 − 系统标时×标时人数",
+    fields: [
+      { k: "sysStd", l: "系统标时", t: "num" },
+      { k: "stdPeople", l: "标时人数", t: "num" },
+      { k: "actStd", l: "实际标时", t: "num" },
+      { k: "actPeople", l: "实际人数", t: "num" },
+      { k: "note", l: "原因备注", t: "text" }
+    ],
+    calc: function(d){
+      var v = (Number(d.actStd)||0)*(Number(d.actPeople)||0) - (Number(d.sysStd)||0)*(Number(d.stdPeople)||0);
+      return v > 0 ? v : 0; // 只统计损失（正影响）
+    }
+  }
+};
+var SECTION_ORDER = ["bujichanList", "pinzhiList", "biaoshiList"];
+
+// ==================== STATE ====================
+var records = [];
+var storageAvailable = false;
+var isPreviewMode = false;
+var currentStep = 0;
+var answers = {};
+var isSubmitted = false;
+var showDetailId = null;
+var dashboardTimeFilter = "day";
+var dashboardDateFilter = (function(){ var d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().split("T")[0]; })();
+var cloudDashboardRecords = [];
+var cloudRecordsCache = [];
+var sysDataCache = [];
+var adminLoggedIn = false;
+
+// ==================== EVENT DELEGATION ====================
+document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.disabled || btn.hasAttribute('disabled')) return;
+    var action = btn.getAttribute('data-action');
+    switch(action) {
+      case 'startInterview': startInterview(); break;
+      case 'showDashboard': showDashboard(); break;
+      case 'showWelcome': showWelcome(); break;
+      case 'goPrev': goPrev(); break;
+      case 'goNext': goNext(); break;
+      case 'addCard': addCard(btn.getAttribute('data-section')); break;
+      case 'delCard': delCard(btn.getAttribute('data-section'), Number(btn.getAttribute('data-idx'))); break;
+      case 'submitInterview': submitInterview(); break;
+      case 'goBackToMissing': goBackToMissing(); break;
+      case 'toggleDetail': toggleDetail(btn.getAttribute('data-param')); break;
+      case 'setTimeFilter': setTimeFilter(btn.getAttribute('data-param')); break;
+      case 'exportData': exportData(); break;
+      case 'showSettings': showSettings(); break;
+      case 'closeSettings': closeSettings(); break;
+      case 'saveWebhookSettings': saveWebhookSettings(); break;
+      case 'testWebhook': testWebhook(); break;
+      case 'showCloudData': showCloudData(); break;
+      case 'closeCloudData': closeCloudData(); break;
+      case 'showAdminLogin': showAdminLogin(); break;
+      case 'adminLogin': adminLogin(); break;
+      case 'backToCloudData': showCloudData(); break;
+      case 'showSysImport': showSysImport(); break;
+      case 'importSysData': importSysData(); break;
+      case 'clearAllCloudData': clearAllCloudData(); break;
+      case 'deleteCloudRecord': deleteCloudRecord(btn.getAttribute('data-param')); break;
+    }
+  });
+  setTimeout(function(){ retryPendingUploads(); }, 3000);
+});
+
+// ==================== HELPERS ====================
+function fmtH(n){ return (Number(n)||0).toFixed(1) + "h"; }
+function fmtNum(n){ return n==null ? "—" : (Math.round(Number(n)*10)/10).toString(); }
+function covColor(c){ if(c>=95) return "#10B981"; if(c>=60) return "#F59E0B"; return "#EF4444"; }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function nowStr(){ return new Date().toLocaleString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false }); }
+function getISOWeek(dateStr){ var d=new Date(dateStr); d.setHours(0,0,0,0); d.setDate(d.getDate()+3-(d.getDay()+6)%7); var w1=new Date(d.getFullYear(),0,4); return d.getFullYear()+"-W"+(1+Math.round(((d-w1)/86400000-3+(w1.getDay()+6)%7)/7)); }
+function getMonthKey(dateStr){ var d=new Date(dateStr); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function getMonthLabel(mk){ var p=mk.split("-"); return p[0]+"年"+parseInt(p[1])+"月"; }
+function getWeekDateRange(wk){ var p=wk.split("-W"); var y=parseInt(p[0]),w=parseInt(p[1]); var jan4=new Date(y,0,4); var mon=new Date(jan4); mon.setDate(jan4.getDate()-(jan4.getDay()+6)%7+(w-1)*7); var sun=new Date(mon); sun.setDate(mon.getDate()+6); return (mon.getMonth()+1)+"月"+mon.getDate()+"日-"+(sun.getMonth()+1)+"月"+sun.getDate()+"日"; }
+function formatDateShort(ds){ var d=new Date(ds); return (d.getMonth()+1)+"月"+d.getDate()+"日"; }
+
+// ==================== STORAGE ====================
+(function initRecords(){
+  try { isPreviewMode = (window.self !== window.top); } catch(e){ isPreviewMode = true; }
+  try { var t="__t__"; localStorage.setItem(t,"1"); localStorage.removeItem(t); storageAvailable=true; } catch(e){ storageAvailable=false; }
+  try { if (storageAvailable){ var saved=localStorage.getItem(STORAGE_KEY); if(saved) records=JSON.parse(saved); } } catch(e){ records=[]; }
+})();
+function saveRecords(){ if(!storageAvailable) return; try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); }catch(e){} }
+
+// ==================== DINGTALK ====================
+var isDingTalkEnv = false;
+(function initDingTalk(){
+  var ua = navigator.userAgent.toLowerCase();
+  isDingTalkEnv = ua.indexOf('dingtalk') >= 0;
+  if (isDingTalkEnv && typeof dd !== 'undefined' && dd.ready) {
+    dd.ready(function(){ try { dd.biz.navigation.setTitle({ title: '班组模糊工时采访' }); } catch(e){} });
+    setTimeout(function(){ var b=document.getElementById('dingtalk-env-badge'); if(b) b.style.display='inline-flex'; }, 100);
+  }
+})();
+
+// ==================== COVERAGE CALC ====================
+function secTotal(section){
+  var def = SECTION_DEFS[section]; var list = answers[section] || []; var t = 0;
+  list.forEach(function(it){ t += def.calc(it); });
+  return t;
+}
+function sysBujichan(){ return Number(answers.sysBujichan) || 0; }
+function sysMohu(){ return Number(answers.sysMohu) || 0; }
+function bujichanCoverage(){ var s=sysBujichan(); return s>0 ? (secTotal('bujichanList')/s)*100 : 100; }
+function mohuTotal(){ return secTotal('pinzhiList') + secTotal('biaoshiList'); }
+function mohuCoverage(){ var s=sysMohu(); return s>0 ? (mohuTotal()/s)*100 : 100; }
+
+// ==================== CLOUD: generic fetch ====================
+function fetchBin(url, delayMs, onDone){
+  setTimeout(function(){
+    var attempt = function(tries){
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url + '/latest', true);
+      xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY);
+      xhr.timeout = 10000;
+      xhr.onload = function(){
+        if (xhr.status>=200 && xhr.status<300){
+          try { var resp=JSON.parse(xhr.responseText); onDone(true, resp.record||{}); }
+          catch(e){ onDone(false, {}); }
+        } else if ((xhr.status===429||xhr.status===403||xhr.status>=500) && tries>0){
+          setTimeout(function(){ attempt(tries-1); }, 1500);
+        } else { onDone(false, {}); }
+      };
+      xhr.onerror=function(){ if(tries>0) setTimeout(function(){attempt(tries-1);},1500); else onDone(false,{}); };
+      xhr.ontimeout=function(){ if(tries>0) setTimeout(function(){attempt(tries-1);},1500); else onDone(false,{}); };
+      xhr.send();
+    };
+    attempt(2);
+  }, delayMs);
+}
+
+// 拉取系统数据（按 team+date）
+function loadSysData(teamName, date, cb){
+  fetchBin(SYSDATA_URL, 0, function(ok, rec){
+    if (!ok){ cb(false, null); return; }
+    var list = (rec && rec.sysdata) || [];
+    sysDataCache = list;
+    var found = null;
+    for (var i=0;i<list.length;i++){ if (list[i].teamName===teamName && list[i].date===date){ found=list[i]; break; } }
+    cb(true, found);
+  });
+}
+
+// ==================== CLOUD: record upload ====================
+function mergeRecords(a, b){
+  var out = a.slice();
+  (b||[]).forEach(function(r){
+    var idx=-1; for(var i=0;i<out.length;i++){ if(out[i].teamName===r.teamName && out[i].date===r.date){ idx=i; break; } }
+    if (idx>=0){ if(String(r.submitTime||"")>String(out[idx].submitTime||"")) out[idx]=r; } else out.push(r);
+  });
+  return out;
+}
+function getPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY)||"[]"); }catch(e){ return []; } }
+function savePending(q){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(q)); }catch(e){} }
+function enqueue(r){ var q=getPending().filter(function(x){ return !(x.record.teamName===r.teamName && x.record.date===r.date); }); q.push({record:r,attempts:0}); savePending(q); }
+function dequeue(r){ savePending(getPending().filter(function(x){ return !(x.record.teamName===r.teamName && x.record.date===r.date); })); }
+function retryPendingUploads(){ var q=getPending(); if(!q.length) return; q.forEach(function(it,i){ setTimeout(function(){ doUpload(it.record,0,true); }, i*3000); }); }
+setInterval(function(){ var q=getPending(); if(q.length) q.forEach(function(it,i){ setTimeout(function(){ doUpload(it.record,0,true); }, i*5000); }); }, 60000);
+
+function showCloudToast(msg, type, sticky){
+  var ex=document.getElementById("cloud-toast"); if(ex) ex.remove();
+  var t=document.createElement("div"); t.id="cloud-toast";
+  var bg=type==="success"?"#ECFDF5":type==="error"?"#FEF2F2":type==="syncing"?"#EFF6FF":"#FFFBEB";
+  var bd=type==="success"?"#059669":type==="error"?"#DC2626":type==="syncing"?"#3B82F6":"#D97706";
+  var cl=type==="success"?"#065F46":type==="error"?"#991B1B":type==="syncing"?"#1E40AF":"#92400E";
+  t.style.cssText="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:"+bg+";border:2px solid "+bd+";border-radius:12px;padding:12px 22px;z-index:10000;max-width:420px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.15);font-size:13px;color:"+cl+";line-height:1.5;transition:opacity 0.4s;";
+  t.innerHTML=msg; document.body.appendChild(t);
+  if(!sticky) setTimeout(function(){ t.style.opacity="0"; setTimeout(function(){t.remove();},500); },4000);
+  return t;
+}
+
+function doUpload(record, attempt, isRetry){
+  var MAX=5;
+  if (attempt>=MAX){ enqueue(record); if(!isRetry) showCloudToast("云端同步失败，将在后台重试","error"); return; }
+  var delay = Math.floor(Math.random()*2000)+500+attempt*1000;
+  setTimeout(function(){
+    var xhr=new XMLHttpRequest();
+    xhr.open('GET', RECORDS_URL+'/latest', true);
+    xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY);
+    xhr.timeout=10000;
+    xhr.onload=function(){
+      if (xhr.status>=200 && xhr.status<300){
+        try{
+          var resp=JSON.parse(xhr.responseText); var data=resp.record||{}; var list=data.records||[];
+          // 滚动窗口：保留 90 天 + 体积护栏 <85KB
+          var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-90); var cut=cutoff.toISOString().slice(0,10);
+          list=list.filter(function(r){ return !r.date || r.date>=cut; });
+          var guard=true; while(guard){ guard=false; if(JSON.stringify({records:list}).length>85000 && list.length>1){ list.shift(); guard=true; } }
+          var idx=-1; for(var i=0;i<list.length;i++){ if(list[i].teamName===record.teamName && list[i].date===record.date){ idx=i; break; } }
+          if(idx>=0) list[idx]=record; else list.push(record);
+          var xhr2=new XMLHttpRequest(); xhr2.open('PUT', RECORDS_URL, true);
+          xhr2.setRequestHeader('Content-Type','application/json'); xhr2.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr2.timeout=10000;
+          xhr2.onload=function(){ if(xhr2.status>=200&&xhr2.status<300) verifyUpload(record,attempt,isRetry); else doUpload(record,attempt+1,isRetry); };
+          xhr2.onerror=function(){ doUpload(record,attempt+1,isRetry); };
+          xhr2.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
+          xhr2.send(JSON.stringify({records:list}));
+        }catch(e){ doUpload(record,attempt+1,isRetry); }
+      } else doUpload(record,attempt+1,isRetry);
+    };
+    xhr.onerror=function(){ doUpload(record,attempt+1,isRetry); };
+    xhr.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
+    xhr.send();
+  }, delay);
+}
+function verifyUpload(record, attempt, isRetry){
+  setTimeout(function(){
+    var xhr=new XMLHttpRequest(); xhr.open('GET', RECORDS_URL+'/latest', true);
+    xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr.timeout=10000;
+    xhr.onload=function(){
+      if (xhr.status>=200 && xhr.status<300){
+        try{
+          var list=(JSON.parse(xhr.responseText).record||{}).records||[];
+          var found=list.some(function(r){ return r.teamName===record.teamName && r.date===record.date && r.submitTime===record.submitTime; });
+          if(found){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); }
+          else doUpload(record,attempt+1,isRetry);
+        }catch(e){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); }
+      } else { dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); }
+    };
+    xhr.onerror=function(){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); };
+    xhr.ontimeout=function(){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); };
+    xhr.send();
+  }, 800);
+}
+function uploadRecordToCloud(record){
+  if(!JSONBIN_API_KEY) return;
+  enqueue(record); showCloudToast("正在同步到云端...","syncing",true); doUpload(record,0,false);
+}
+
+// ==================== INTERVIEW FLOW ====================
+// steps: 0班组 1日期 2系统数据 3不记产明细 4品质返工明细 5标时不达成明细 6完成
+var TOTAL_STEPS = 7;
+function stepTitle(s){ return ["选择班组","选择日期","系统数据","不记产工时明细","品质返工明细","标时不达成明细","提交"][s]; }
+
+function startInterview(){
+  currentStep=0; answers={ teamName:"", date:"", sysBujichan:null, sysMohu:null, sysLoaded:false, bujichanList:[], pinzhiList:[], biaoshiList:[] };
+  isSubmitted=false;
+  document.getElementById("welcome").classList.add("hidden");
+  document.getElementById("dashboard").classList.add("hidden");
+  document.getElementById("interview").classList.remove("hidden");
+  renderInterview();
+}
+
+function renderInterview(){
+  document.getElementById("progress-fill").style.width = (((currentStep+1)/TOTAL_STEPS)*100)+"%";
+  document.getElementById("interview-sub").textContent = "第 "+(currentStep+1)+" 步 / 共 "+TOTAL_STEPS+" 步 · "+stepTitle(currentStep);
+  // chat history
+  var ch=document.getElementById("chat-history"); ch.innerHTML="";
+  if (answers.teamName){ ch.innerHTML+=bubble("q","请选择班组")+bubble("a",answers.teamName); }
+  if (answers.date){ ch.innerHTML+=bubble("q","这是哪一天的数据？")+bubble("a",answers.date); }
+  if (currentStep>=2){
+    ch.innerHTML+=bubble("q","系统数据（后台导入）");
+    ch.innerHTML+=bubble("a", answers.sysLoaded ? ("不记产 "+fmtNum(answers.sysBujichan)+"h · 模糊 "+fmtNum(answers.sysMohu)+"h") : "未导入");
+  }
+  if (currentStep>=3){ ch.innerHTML+=bubble("q","不记产工时明细")+bubble("a",(answers.bujichanList.length)+" 条 · 合计 "+fmtNum(secTotal('bujichanList'))+"h"); }
+  if (currentStep>=4){ ch.innerHTML+=bubble("q","品质返工明细")+bubble("a",(answers.pinzhiList.length)+" 条 · 合计 "+fmtNum(secTotal('pinzhiList'))+"h"); }
+  if (currentStep>=5){ ch.innerHTML+=bubble("q","标时不达成明细")+bubble("a",(answers.biaoshiList.length)+" 条 · 合计 "+fmtNum(secTotal('biaoshiList'))+"h"); }
+
+  var card=document.getElementById("question-card");
+  if (currentStep===0) renderTeamStep(card);
+  else if (currentStep===1) renderDateStep(card);
+  else if (currentStep===2) renderSysStep(card);
+  else if (currentStep===3) renderListStep(card,'bujichanList');
+  else if (currentStep===4) renderListStep(card,'pinzhiList');
+  else if (currentStep===5) renderListStep(card,'biaoshiList');
+  else renderCompletion(card);
+
+  setTimeout(function(){ var c=document.getElementById("question-card"); if(c) c.scrollIntoView({behavior:'smooth',block:'end'}); },100);
+}
+function bubble(type,text){ return '<div class="chat-msg '+type+'"><div class="chat-bubble">'+esc(text)+'</div></div>'; }
+
+function renderTeamStep(card){
+  var html='<div class="question-header"><div class="question-icon">'+iconQ()+'</div><span class="question-label">请选择班组</span></div>';
+  html+='<select class="question-input" id="current-input" style="appearance:auto;cursor:pointer"><option value="">请选择班组</option>';
+  TEAM_OPTIONS.forEach(function(o){ html+='<option value="'+o+'"'+(answers.teamName===o?' selected':'')+'>'+o+'</option>'; });
+  html+='</select><div id="nav-container"></div>';
+  card.innerHTML=html;
+  document.getElementById("current-input").addEventListener('change',function(){ answers.teamName=this.value; renderNavButtons(); });
+  renderNavButtons();
+}
+function renderDateStep(card){
+  var html='<div class="question-header"><div class="question-icon">'+iconQ()+'</div><span class="question-label">这是哪一天的数据？</span></div>';
+  var dv=answers.date || new Date(Date.now()-86400000).toISOString().split('T')[0];
+  answers.date=dv;
+  html+='<input class="question-input" type="date" id="current-input" value="'+dv+'"/><div id="nav-container"></div>';
+  card.innerHTML=html;
+  document.getElementById("current-input").addEventListener('input',function(){ answers.date=this.value; renderNavButtons(); });
+  renderNavButtons();
+}
+function renderSysStep(card){
+  var html='<div class="question-header"><div class="question-icon info">'+iconInfo()+'</div><span class="question-label">系统数据（后台导入）</span></div>';
+  if (!answers.sysLoaded){
+    html+='<div style="padding:14px 16px;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#991B1B;font-size:14px;line-height:1.7">';
+    html+='未找到 <strong>'+esc(answers.teamName)+'</strong> '+esc(answers.date)+' 的系统数据。<br/>请管理员在“云端数据 → 管理 → 导入系统数据”中导入后，再重新进入采访。';
+    html+='</div>';
+  } else {
+    html+='<div class="analysis-grid">';
+    html+='<div class="analysis-item"><div class="analysis-item-label">不记产工时-系统数据</div><div class="analysis-item-value" style="color:#F59E0B">'+fmtNum(answers.sysBujichan)+' h</div><div class="analysis-item-sub">需由不记产明细覆盖≥95%</div></div>';
+    html+='<div class="analysis-item"><div class="analysis-item-label">模糊工时-系统数据</div><div class="analysis-item-value" style="color:#7C3AED">'+fmtNum(answers.sysMohu)+' h</div><div class="analysis-item-sub">需由品质返工+标时不达成覆盖≥95%</div></div>';
+    html+='</div>';
+  }
+  html+='<div id="nav-container"></div>';
+  card.innerHTML=html;
+  renderNavButtons();
+}
+
+function renderListStep(card, section){
+  var def=SECTION_DEFS[section];
+  var covLabel, cov, needCard;
+  if (section==='bujichanList'){ cov=bujichanCoverage(); needCard=sysBujichan()>0; covLabel='不记产覆盖率'; }
+  else { cov=mohuCoverage(); needCard=sysMohu()>0; covLabel='模糊覆盖率'; }
+  var covColor2=covColor(cov);
+
+  var html='<div class="question-header"><div class="question-icon warning">'+iconList()+'</div><span class="question-label">'+def.title+'</span></div>';
+  html+='<div style="font-size:12px;color:#9CA3AF;margin:-10px 0 14px">'+def.desc+'</div>';
+
+  // coverage bar (only meaningful when system data loaded)
+  if (answers.sysLoaded){
+    html+='<div class="coverage-bar-wrap"><div class="coverage-text" style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:13px;color:#6B7280">'+covLabel+'（需≥95%）</span><span style="font-size:13px;font-weight:700;color:'+covColor2+'">'+fmtNum(section==='bujichanList'?secTotal('bujichanList'):mohuTotal())+' / '+fmtNum(section==='bujichanList'?sysBujichan():sysMohu())+' h ('+cov.toFixed(0)+'%)</span></div><div class="coverage-bar"><div class="coverage-bar-fill" style="width:'+Math.min(cov,100)+'%;background:'+covColor2+'"></div></div></div>';
+  } else {
+    html+='<div style="padding:10px 14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;font-size:12px;color:#92400E;margin-bottom:12px">系统数据未导入，覆盖率暂无法计算。可先填写明细，提交前需管理员导入系统数据。</div>';
+  }
+
+  html+='<div style="--sec-color:'+def.color+'">';
+  var list=answers[section]||[];
+  if (list.length===0){
+    html+='<div style="text-align:center;color:#9CA3AF;font-size:13px;padding:16px 0">点击下方按钮添加明细条目</div>';
+  }
+  list.forEach(function(item, idx){
+    html+='<div class="detail-card" style="border:1px solid '+def.color+'30;background:'+def.color+'08">';
+    html+='<div class="detail-card-head"><span class="detail-card-title" style="color:'+def.color+'">条目 '+(idx+1)+'</span>';
+    html+='<span class="field-calc" style="color:'+def.color+';margin-left:auto">工时：<span id="calc-'+section+'-'+idx+'">'+fmtNum(def.calc(item))+'</span> h</span>';
+    html+='<button class="detail-card-del" data-action="delCard" data-section="'+section+'" data-idx="'+idx+'"'+(list.length<=1?' disabled':'')+'>删除</button>';
+    html+='</div>';
+    def.fields.forEach(function(f){
+      var val=item[f.k]; if(val==null) val="";
+      html+='<div class="field-row"><label class="field-label">'+f.l+'</label>';
+      html+='<input class="field-input" type="'+(f.t==='num'?'number':'text')+'" data-section="'+section+'" data-idx="'+idx+'" data-field="'+f.k+'" data-type="'+f.t+'" value="'+esc(val)+'" placeholder="请输入'+f.l+'"/></div>';
+    });
+    html+='</div>';
+  });
+  html+='<button class="btn-add-card" data-action="addCard" data-section="'+section+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> 添加一条'+def.title.replace('明细','')+'</button>';
+  html+='</div>';
+  html+='<div id="validation-msg"></div>';
+  html+='<div id="nav-container"></div>';
+  card.innerHTML=html;
+
+  // input listeners (delegation on card)
+  card.querySelectorAll('.field-input').forEach(function(inp){
+    inp.addEventListener('input', function(){ onFieldInput(this); });
+  });
+  renderNavButtons();
+  updateValidationMsg();
+}
+
+function onFieldInput(el){
+  var section=el.getAttribute('data-section'); var idx=Number(el.getAttribute('data-idx')); var field=el.getAttribute('data-field'); var type=el.getAttribute('data-type');
+  var item=answers[section][idx]; if(!item) return;
+  item[field] = type==='num' ? (el.value===""?"":Number(el.value)) : el.value;
+  // patch computed hours for this card
+  var calcEl=document.getElementById('calc-'+section+'-'+idx);
+  if (calcEl) calcEl.textContent = fmtNum(SECTION_DEFS[section].calc(item));
+  // patch coverage bar
+  patchCoverage(section);
+  renderNavButtons();
+  updateValidationMsg();
+}
+function patchCoverage(section){
+  if (!answers.sysLoaded) return;
+  var wrap=document.querySelector('.coverage-bar-wrap'); if(!wrap) return;
+  var cov, num, den, label;
+  if (section==='bujichanList'){ cov=bujichanCoverage(); num=secTotal('bujichanList'); den=sysBujichan(); label='不记产覆盖率（需≥95%）'; }
+  else { cov=mohuCoverage(); num=mohuTotal(); den=sysMohu(); label='模糊覆盖率（需≥95%）'; }
+  var c=covColor(cov);
+  wrap.innerHTML='<div class="coverage-text" style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:13px;color:#6B7280">'+label+'</span><span style="font-size:13px;font-weight:700;color:'+c+'">'+fmtNum(num)+' / '+fmtNum(den)+' h ('+cov.toFixed(0)+'%)</span></div><div class="coverage-bar"><div class="coverage-bar-fill" style="width:'+Math.min(cov,100)+'%;background:'+c+'"></div></div>';
+}
+
+function addCard(section){
+  saveFieldValues();
+  var blank={}; SECTION_DEFS[section].fields.forEach(function(f){ blank[f.k]=""; });
+  answers[section].push(blank);
+  renderInterview();
+}
+function delCard(section, idx){
+  saveFieldValues();
+  if (answers[section].length<=1) return;
+  answers[section].splice(idx,1);
+  renderInterview();
+}
+function saveFieldValues(){
+  document.querySelectorAll('.field-input').forEach(function(inp){
+    var section=inp.getAttribute('data-section'); var idx=Number(inp.getAttribute('data-idx')); var field=inp.getAttribute('data-field'); var type=inp.getAttribute('data-type');
+    if (answers[section] && answers[section][idx]){ answers[section][idx][field] = type==='num'?(inp.value===""?"":Number(inp.value)):inp.value; }
+  });
+}
+
+// ==================== VALIDATION ====================
+function cardMissing(section, item){
+  var def=SECTION_DEFS[section]; var miss=[];
+  def.fields.forEach(function(f){
+    var v=item[f.k];
+    if (f.t==='text'){ if(v==null||String(v).trim()==="") miss.push(f.l); }
+    else { if(v==null||v===""||Number(v)<=0) miss.push(f.l); }
+  });
+  return miss;
+}
+function sectionCardsValid(section){
+  var list=answers[section]||[];
+  for (var i=0;i<list.length;i++){ if(cardMissing(section,list[i]).length>0) return false; }
+  return true;
+}
+function updateValidationMsg(){
+  if (currentStep<3||currentStep>5) return;
+  var section=SECTION_ORDER[currentStep-3];
+  var el=document.getElementById('validation-msg'); if(!el) return;
+  saveFieldValues();
+  var list=answers[section]||[]; var incomplete=[];
+  list.forEach(function(item,i){ var m=cardMissing(section,item); if(m.length) incomplete.push({i:i,m:m}); });
+  if (incomplete.length){
+    var h='<div style="margin-top:10px;padding:10px 14px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:10px;font-size:12px;color:#92400E"><div style="font-weight:600;margin-bottom:4px">以下条目信息不完整：</div>';
+    incomplete.forEach(function(x){ h+='<div style="margin-top:2px">• 条目 '+(x.i+1)+'：还需填写 '+x.m.join('、')+'</div>'; });
+    el.innerHTML=h+'</div>';
+  } else el.innerHTML='';
+}
+
+function canProceed(){
+  if (currentStep===0) return !!answers.teamName;
+  if (currentStep===1) return !!answers.date;
+  if (currentStep===2) return true; // 允许在无系统数据时继续填明细
+  if (currentStep>=3 && currentStep<=5){
+    var section=SECTION_ORDER[currentStep-3];
+    return sectionCardsValid(section);
+  }
+  return true;
+}
+function renderNavButtons(){
+  var nav=document.getElementById("nav-container"); if(!nav) return;
+  var html='<div class="nav-buttons"><button class="btn-nav btn-prev"'+(currentStep===0?' disabled':'')+' data-action="goPrev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> 上一步</button>';
+  if (currentStep===TOTAL_STEPS-1){ nav.innerHTML=''; return; }
+  var nextLabel = currentStep===5 ? '下一步（完成）' : '下一步';
+  html+='<button class="btn-nav btn-next primary"'+(canProceed()?'':' disabled')+' data-action="goNext">'+nextLabel+' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>';
+  html+='</div>';
+  nav.innerHTML=html;
+}
+function goNext(){
+  saveFieldValues();
+  if (currentStep===1){
+    // entering sys step: load system data
+    currentStep=2; renderInterview(); loadSysIntoAnswers(); return;
+  }
+  if (currentStep<TOTAL_STEPS-1){ currentStep++; renderInterview(); }
+}
+function goPrev(){ if(currentStep>0){ saveFieldValues(); currentStep--; renderInterview(); } }
+function loadSysIntoAnswers(){
+  var tn=answers.teamName, dt=answers.date; if(!tn||!dt) return;
+  loadSysData(tn, dt, function(ok, found){
+    if (ok && found){ answers.sysLoaded=true; answers.sysBujichan=Number(found.bujichan)||0; answers.sysMohu=Number(found.mohu)||0; }
+    else { answers.sysLoaded=false; answers.sysBujichan=null; answers.sysMohu=null; }
+    if (currentStep===2) renderInterview();
+  });
+}
+function goBackToMissing(){
+  if (!answers.teamName){ currentStep=0; renderInterview(); return; }
+  if (!answers.date){ currentStep=1; renderInterview(); return; }
+  for (var i=0;i<3;i++){ var sec=SECTION_ORDER[i]; if(!sectionCardsValid(sec)){ currentStep=3+i; renderInterview(); return; } }
+  currentStep=6; renderInterview();
+}
+
+// ==================== COMPLETION / SUBMIT ====================
+function coverageOk(){
+  if (!answers.sysLoaded) return { ok:false, reason:'系统数据未导入，无法计算覆盖率，请先由管理员导入' };
+  var bc=bujichanCoverage(), mc=mohuCoverage();
+  var bad=[];
+  if (sysBujichan()>0 && bc<95) bad.push('不记产覆盖率 '+bc.toFixed(0)+'%（需≥95%）');
+  if (sysMohu()>0 && mc<95) bad.push('模糊覆盖率 '+mc.toFixed(0)+'%（需≥95%）');
+  if (bad.length) return { ok:false, reason:bad.join('；') };
+  return { ok:true };
+}
+function renderCompletion(card){
+  saveFieldValues();
+  var bc=bujichanCoverage(), mc=mohuCoverage();
+  var cov=coverageOk();
+  var html='<div class="completion">';
+  html+='<h3 style="font-size:20px;color:'+(cov.ok?'#065F46':'#B91C1C')+';margin-bottom:8px">采访结束，请提交</h3>';
+  html+='<p><strong>'+esc(answers.teamName)+'</strong> · '+esc(answers.date)+'</p>';
+  html+='<div style="text-align:left;margin:16px 0;padding:14px 16px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px">';
+  html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">覆盖率分析</div>';
+  html+='<div class="analysis-grid">';
+  html+='<div class="analysis-item '+(sysBujichan()<=0?'':(bc>=95?'ok':'warn'))+'"><div class="analysis-item-label">不记产覆盖率</div><div class="analysis-item-value" style="color:'+(bc>=95?'#10B981':'#EF4444')+'">'+(answers.sysLoaded?bc.toFixed(0)+'%':'—')+'</div><div class="analysis-item-sub">明细 '+fmtNum(secTotal('bujichanList'))+'h / 系统 '+fmtNum(answers.sysBujichan)+'h</div></div>';
+  html+='<div class="analysis-item '+(sysMohu()<=0?'':(mc>=95?'ok':'warn'))+'"><div class="analysis-item-label">模糊覆盖率</div><div class="analysis-item-value" style="color:'+(mc>=95?'#10B981':'#EF4444')+'">'+(answers.sysLoaded?mc.toFixed(0)+'%':'—')+'</div><div class="analysis-item-sub">品质返工+标时不达成 '+fmtNum(mohuTotal())+'h / 系统 '+fmtNum(answers.sysMohu)+'h</div></div>';
+  html+='</div>';
+  html+='<div style="font-size:12px;color:#6B7280">不记产 '+answers.bujichanList.length+' 条 · 品质返工 '+answers.pinzhiList.length+' 条 · 标时不达成 '+answers.biaoshiList.length+' 条</div>';
+  html+='</div>';
+
+  if (!cov.ok){
+    html+='<div style="margin:12px 0;padding:12px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;text-align:left"><div style="font-size:13px;font-weight:700;color:#991B1B;margin-bottom:6px">⚠️ 无法提交</div><div style="font-size:12px;color:#B91C1C;line-height:1.6">'+esc(cov.reason)+'</div></div>';
+    html+='<button class="btn-submit" disabled style="opacity:.5;cursor:not-allowed">请先满足覆盖率要求</button>';
+    html+='<button class="btn-submit" data-action="goBackToMissing" style="background:#F59E0B;margin-top:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> 返回补充明细</button>';
+  } else if (isSubmitted){
+    html+='<button class="btn-submit" disabled style="opacity:.5;cursor:not-allowed;background:#9CA3AF">已提交</button>';
+  } else {
+    html+='<button class="btn-submit" data-action="submitInterview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> 提交并查看看板</button>';
+  }
+  html+='</div>';
+  card.innerHTML=html;
+}
+
+function submitInterview(){
+  if (isSubmitted) return;
+  saveFieldValues();
+  if (!coverageOk().ok) return;
+  var exist=records.find(function(r){ return r.teamName===answers.teamName && r.date===answers.date; });
+  if (exist && !confirm("该班组今日已有记录，新数据将覆盖，是否继续？")) return;
+  isSubmitted=true;
+  var record={
+    id: Date.now(), submitTime: nowStr(),
+    teamName: answers.teamName, date: answers.date,
+    sysBujichan: sysBujichan(), sysMohu: sysMohu(),
+    bujichanList: answers.bujichanList.map(function(x){ return {name:x.name,position:x.position,content:x.content,hours:Number(x.hours)||0}; }),
+    pinzhiList: answers.pinzhiList.map(function(x){ return {model:x.model,people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.pinzhiList.calc(x)}; }),
+    biaoshiList: answers.biaoshiList.map(function(x){ return {sysStd:Number(x.sysStd)||0,stdPeople:Number(x.stdPeople)||0,actStd:Number(x.actStd)||0,actPeople:Number(x.actPeople)||0,note:x.note||"",hours:SECTION_DEFS.biaoshiList.calc(x)}; }),
+    bujichanTotal: secTotal('bujichanList'),
+    pinzhiTotal: secTotal('pinzhiList'),
+    biaoshiTotal: secTotal('biaoshiList'),
+    mohuTotal: mohuTotal(),
+    bujichanCoverage: bujichanCoverage(),
+    mohuCoverage: mohuCoverage()
+  };
+  var idx=records.findIndex(function(r){ return r.teamName===record.teamName && r.date===record.date; });
+  if (idx>=0) records[idx]=record; else records.push(record);
+  saveRecords(); sendDingTalkNotification(record); uploadRecordToCloud(record);
+  showDashboard();
+}
+
+// ==================== DINGTALK WEBHOOK ====================
+function getWebhookConfig(){ try{ var s=localStorage.getItem(WEBHOOK_KEY); if(s) return JSON.parse(s); }catch(e){} return {url:"",enabled:false,secret:""}; }
+function setWebhookConfig(c){ try{ localStorage.setItem(WEBHOOK_KEY, JSON.stringify(c)); }catch(e){} }
+function sendDingTalkNotification(record){
+  var cfg=getWebhookConfig(); if(!cfg.enabled||!cfg.url) return;
+  var text='### '+esc(record.teamName)+' 模糊工时日报\n\n**日期：** '+record.date+'\n\n';
+  text+='| 指标 | 数值 |\n|:---|:---|\n';
+  text+='| 不记产-系统 | '+fmtNum(record.sysBujichan)+'h |\n';
+  text+='| 不记产-明细 | '+fmtNum(record.bujichanTotal)+'h |\n';
+  text+='| 不记产覆盖率 | **'+record.bujichanCoverage.toFixed(0)+'%** |\n';
+  text+='| 模糊-系统 | '+fmtNum(record.sysMohu)+'h |\n';
+  text+='| 品质返工 | '+fmtNum(record.pinzhiTotal)+'h |\n';
+  text+='| 标时不达成 | '+fmtNum(record.biaoshiTotal)+'h |\n';
+  text+='| 模糊覆盖率 | **'+record.mohuCoverage.toFixed(0)+'%** |\n';
+  var payload={msgtype:"markdown",markdown:{title:record.teamName+' 模糊工时日报',text:text}};
+  sendWebhookRequest(cfg.url,cfg.secret,payload,function(){});
+}
+function sendWebhookRequest(url,secret,payload,cb){
+  var finalUrl=url;
+  if (secret && secret.indexOf('SEC')===0){
+    var ts=Date.now();
+    computeHmacSha256(ts+'\n'+secret, secret).then(function(sign){ finalUrl=url+'&timestamp='+ts+'&sign='+encodeURIComponent(sign); doWebhookPost(finalUrl,payload,cb); }).catch(function(){ doWebhookPost(url,payload,cb); });
+  } else doWebhookPost(finalUrl,payload,cb);
+}
+function computeHmacSha256(message,secret){ var enc=new TextEncoder(); return crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']).then(function(k){ return crypto.subtle.sign('HMAC',k,enc.encode(message)); }).then(function(sig){ return btoa(String.fromCharCode.apply(null,new Uint8Array(sig))); }); }
+function doWebhookPost(url,payload,cb){
+  var body=JSON.stringify(payload);
+  if (isDingTalkEnv && typeof dd!=='undefined' && dd.httpRequest){
+    dd.httpRequest({url:url,method:'POST',headers:{'Content-Type':'application/json'},data:body,contentType:'application/json',dataType:'json',success:function(res){ cb(true,res); },fail:function(e){ cb(false,e); }});
+  } else {
+    var xhr=new XMLHttpRequest(); xhr.open('POST',url,true); xhr.setRequestHeader('Content-Type','application/json'); xhr.timeout=10000;
+    xhr.onload=function(){ cb(xhr.status>=200&&xhr.status<300, xhr.responseText); };
+    xhr.onerror=function(){ cb(false,'网络错误（非钉钉环境无法跨域）'); };
+    xhr.send(body);
+  }
+}
+
+// ==================== SETTINGS MODAL ====================
+function showSettings(){
+  var ex=document.getElementById("settings-overlay"); if(ex) ex.remove();
+  var cfg=getWebhookConfig();
+  var ov=document.createElement("div"); ov.id="settings-overlay"; ov.className="settings-overlay"; ov.onclick=function(e){ if(e.target===ov) closeSettings(); };
+  var h='<div class="settings-modal"><h3>'+iconGear('#D97706')+' 钉钉通知设置</h3>';
+  h+='<div class="settings-section"><div class="settings-section-title"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="webhook-enabled" '+(cfg.enabled?'checked':'')+' style="width:16px;height:16px;accent-color:#059669"/> 启用钉钉群机器人通知</label></div>';
+  h+='<div style="margin-bottom:12px"><label style="font-size:13px;color:#6B7280;display:block;margin-bottom:4px">Webhook 地址</label><input class="settings-input" id="webhook-url" value="'+esc(cfg.url)+'" placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxx"/></div>';
+  h+='<div><label style="font-size:13px;color:#6B7280;display:block;margin-bottom:4px">加签密钥（可选）</label><input class="settings-input" id="webhook-secret" value="'+esc(cfg.secret)+'" placeholder="SECxxx"/></div>';
+  h+='<div id="webhook-test-status" class="settings-status"></div></div>';
+  h+='<div class="settings-btn-row"><button class="settings-btn settings-btn-test" data-action="testWebhook">发送测试</button><button class="settings-btn settings-btn-cancel" data-action="closeSettings">取消</button><button class="settings-btn settings-btn-save" data-action="saveWebhookSettings">保存</button></div>';
+  h+='</div>';
+  ov.innerHTML=h; document.body.appendChild(ov);
+}
+function closeSettings(){ var o=document.getElementById("settings-overlay"); if(o) o.remove(); }
+function saveWebhookSettings(){
+  var url=(document.getElementById('webhook-url').value||'').trim();
+  var secret=(document.getElementById('webhook-secret').value||'').trim();
+  var enabled=document.getElementById('webhook-enabled').checked;
+  if(enabled&&!url){ alert('请先填写 Webhook 地址'); return; }
+  setWebhookConfig({url:url,enabled:enabled,secret:secret}); closeSettings(); alert('设置已保存');
+}
+function testWebhook(){
+  var url=(document.getElementById('webhook-url').value||'').trim(); var secret=(document.getElementById('webhook-secret').value||'').trim();
+  var st=document.getElementById('webhook-test-status'); if(!url){ st.className='settings-status error'; st.textContent='请先填写 Webhook 地址'; return; }
+  st.className='settings-status success'; st.textContent='正在发送...';
+  sendWebhookRequest(url,secret,{msgtype:"markdown",markdown:{title:"测试",text:"### 模糊工时系统\n\n测试通知 "+new Date().toLocaleString('zh-CN')}},function(ok){ st.className='settings-status '+(ok?'success':'error'); st.textContent=ok?'发送成功！':'失败：检查地址'; });
+}
+
+// ==================== DASHBOARD ====================
+function showDashboard(){
+  document.getElementById("welcome").classList.add("hidden");
+  document.getElementById("interview").classList.add("hidden");
+  document.getElementById("dashboard").classList.remove("hidden");
+  document.querySelectorAll('.time-filter-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-param')===dashboardTimeFilter); });
+  renderDatePicker();
+  document.getElementById("dashboard-sub").textContent='正在加载云端数据...';
+  loadCloudForView(function(list){ cloudDashboardRecords=list; renderDashboard(); }, function(){ document.getElementById("dashboard-sub").textContent='网络错误，无法加载云端数据'; });
+}
+function loadCloudForView(onDone,onError){ fetchBin(RECORDS_URL,0,function(ok,rec){ if(ok) onDone((rec&&rec.records)||[]); else if(onError) onError(); }); }
+function setTimeFilter(dim){ dashboardTimeFilter=dim; var now=new Date(); if(dim==='day'){ var d=new Date(); d.setDate(d.getDate()-1); dashboardDateFilter=d.toISOString().split('T')[0]; } else if(dim==='week'){ dashboardDateFilter=getISOWeek(now.toISOString().split('T')[0]); } else { dashboardDateFilter=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,'0'); } document.querySelectorAll('.time-filter-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-param')===dim); }); renderDatePicker(); renderDashboard(); }
+function renderDatePicker(){
+  var wrap=document.getElementById("date-picker-wrap"); if(!wrap) return;
+  if (dashboardTimeFilter==='day'){ wrap.innerHTML='<label>日期</label><input type="date" class="date-picker-input" id="dp" value="'+dashboardDateFilter+'"/>'; }
+  else if (dashboardTimeFilter==='week'){ wrap.innerHTML='<label>日期(算周)</label><input type="date" class="date-picker-input" id="dp" value="'+dashboardDateFilter+'"/>'; }
+  else { wrap.innerHTML='<label>月份</label><input type="month" class="date-picker-input" id="dp" value="'+dashboardDateFilter+'"/>'; }
+  var inp=document.getElementById('dp'); if(inp) inp.addEventListener('change',function(){ dashboardDateFilter = dashboardTimeFilter==='week'? getISOWeek(this.value): this.value; renderDashboard(); });
+}
+
+function aggregate(records, dim){
+  var filtered=records;
+  if (dashboardDateFilter){ filtered=records.filter(function(r){ if(dim==='day') return r.date===dashboardDateFilter; if(dim==='week') return getISOWeek(r.date)===dashboardDateFilter; return getMonthKey(r.date)===dashboardDateFilter; }); }
+  if (dim==='day') return filtered.slice();
+  var groups={}, order=[];
+  filtered.forEach(function(r){
+    var tk = dim==='week'? getISOWeek(r.date): getMonthKey(r.date);
+    var key=(r.teamName||"未知")+"|"+tk;
+    if(!groups[key]){ groups[key]={ key:key,label:r.teamName||"未知",teamName:r.teamName||"未知",date:tk,sysBujichan:0,sysMohu:0,bujichanTotal:0,pinzhiTotal:0,biaoshiTotal:0,mohuTotal:0,bujichanList:[],pinzhiList:[],biaoshiList:[],_c:0 }; order.push(key); }
+    var g=groups[key];
+    g.sysBujichan+=r.sysBujichan||0; g.sysMohu+=r.sysMohu||0;
+    g.bujichanTotal+=r.bujichanTotal||0; g.pinzhiTotal+=r.pinzhiTotal||0; g.biaoshiTotal+=r.biaoshiTotal||0; g.mohuTotal+=r.mohuTotal||0;
+    g.bujichanList=g.bujichanList.concat(r.bujichanList||[]); g.pinzhiList=g.pinzhiList.concat(r.pinzhiList||[]); g.biaoshiList=g.biaoshiList.concat(r.biaoshiList||[]);
+    g._c++;
+  });
+  return order.map(function(k){ var g=groups[k]; g.bujichanCoverage=g.sysBujichan>0?g.bujichanTotal/g.sysBujichan*100:100; g.mohuCoverage=g.sysMohu>0?g.mohuTotal/g.sysMohu*100:100; return g; });
+}
+
+function renderDashboard(){
+  var data=aggregate(cloudDashboardRecords, dashboardTimeFilter);
+  data.sort(function(a,b){ var ai=TEAM_SORT.indexOf(a.teamName),bi=TEAM_SORT.indexOf(b.teamName); if(ai<0)ai=99; if(bi<0)bi=99; if(ai!==bi) return ai-bi; return (a.date||"").localeCompare(b.date||""); });
+  var rangeText="";
+  if (dashboardTimeFilter==='day') rangeText=formatDateShort(dashboardDateFilter);
+  else if (dashboardTimeFilter==='week') rangeText=getWeekDateRange(dashboardDateFilter);
+  else rangeText=getMonthLabel(dashboardDateFilter);
+  document.getElementById("dashboard-sub").textContent='共 '+data.length+' '+(dashboardTimeFilter==='day'?'条记录':'个班组')+' · '+rangeText;
+
+  var totSysB=0,totB=0,totSysM=0,totM=0,totPZ=0,totBS=0,needFix=0;
+  data.forEach(function(r){ totSysB+=r.sysBujichan||0; totB+=r.bujichanTotal||0; totSysM+=r.sysMohu||0; totM+=r.mohuTotal||0; totPZ+=r.pinzhiTotal||0; totBS+=r.biaoshiTotal||0; if((r.sysBujichan>0&&r.bujichanCoverage<95)||(r.sysMohu>0&&r.mohuCoverage<95)) needFix++; });
+  var avgB=totSysB>0?totB/totSysB*100:100, avgM=totSysM>0?totM/totSysM*100:100;
+
+  var html='<div class="kpi-grid">';
+  html+=kpiCard('#EEF2FF','#4F46E5',iconTeam(),(dashboardTimeFilter==='day'?'班组数量':'时段数量'),data.length,'');
+  html+=kpiCard('#FEF3C7','#D97706',iconClock(),'不记产覆盖率',avgB.toFixed(0)+'%','明细 '+fmtNum(totB)+'h / 系统 '+fmtNum(totSysB)+'h');
+  html+=kpiCard('#F5F3FF','#7C3AED',iconClock(),'模糊覆盖率',avgM.toFixed(0)+'%','明细 '+fmtNum(totM)+'h / 系统 '+fmtNum(totSysM)+'h');
+  html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','品质返工 '+fmtNum(totPZ)+'h · 标时不达成 '+fmtNum(totBS)+'h');
+  html+=kpiCard('#FEF2F2','#EF4444',iconWarn(),'待补(未达95%)',needFix,'需补充明细的班组');
+  html+='</div>';
+
+  html+='<div class="chart-grid">';
+  html+='<div class="chart-card"><h3>各'+(dashboardTimeFilter==='day'?'班组':'时段')+'模糊覆盖率</h3><div class="chart-container"><canvas id="c-mohu"></canvas></div></div>';
+  html+='<div class="chart-card"><h3>各'+(dashboardTimeFilter==='day'?'班组':'时段')+'不记产覆盖率</h3><div class="chart-container"><canvas id="c-bjc"></canvas></div></div>';
+  html+='</div>';
+  html+='<div class="chart-grid"><div class="chart-card"><h3>模糊工时构成</h3><div class="chart-container"><canvas id="c-comp"></canvas></div></div></div>';
+
+  // table
+  var isDay=dashboardTimeFilter==='day';
+  html+='<div class="table-card"><div class="table-header"><h3>数据明细</h3><span>'+(isDay?data.length+' 条记录':data.length+' 个班组')+'</span><button class="btn-export" data-action="exportData" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出明细</button></div>';
+  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>不记产系统</th><th>不记产明细</th><th>不记产覆盖</th><th>模糊系统</th><th>品质返工</th><th>标时不达成</th><th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
+  data.forEach(function(r){
+    var bOk=r.sysBujichan<=0||r.bujichanCoverage>=95, mOk=r.sysMohu<=0||r.mohuCoverage>=95;
+    var ok=bOk&&mOk;
+    html+='<tr>';
+    html+='<td style="font-weight:600;color:#111827">'+esc(r.label||r.teamName)+'</td>';
+    if(isDay) html+='<td style="color:#6B7280;white-space:nowrap">'+esc(r.date)+'</td>';
+    html+='<td>'+fmtNum(r.sysBujichan)+'</td>';
+    html+='<td>'+fmtNum(r.bujichanTotal)+'</td>';
+    html+='<td style="font-weight:600;color:'+(r.sysBujichan>0?covColor(r.bujichanCoverage):'#9CA3AF')+'">'+(r.sysBujichan>0?r.bujichanCoverage.toFixed(0)+'%':'—')+'</td>';
+    html+='<td>'+fmtNum(r.sysMohu)+'</td>';
+    html+='<td>'+fmtNum(r.pinzhiTotal)+'</td>';
+    html+='<td>'+fmtNum(r.biaoshiTotal)+'</td>';
+    html+='<td style="font-weight:600;color:'+(r.sysMohu>0?covColor(r.mohuCoverage):'#9CA3AF')+'">'+(r.sysMohu>0?r.mohuCoverage.toFixed(0)+'%':'—')+'</td>';
+    html+='<td><span class="status-badge" style="background:'+(ok?'#ECFDF5':'#FEF2F2')+';color:'+(ok?'#059669':'#DC2626')+'">'+(ok?'达标':'需补充')+'</span></td>';
+    html+='<td>'+(hasDetail(r)?'<button class="btn-detail" data-action="toggleDetail" data-param="'+esc(r.key||r.teamName+'|'+r.date)+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> 详情</button>':'')+'</td>';
+    html+='</tr>';
+    var rk=esc(r.key||r.teamName+'|'+r.date);
+    if (showDetailId===rk && hasDetail(r)){
+      html+='<tr class="detail-row"><td colspan="11"><div class="detail-content">'+detailBlock(r)+'</div></td></tr>';
+    }
+  });
+  html+='</tbody></table></div></div>';
+
+  document.getElementById("dashboard-content").innerHTML=html;
+  setTimeout(function(){ drawCovChart('c-mohu', data, 'mohu'); drawCovChart('c-bjc', data, 'bujichan'); drawCompChart('c-comp', totPZ, totBS); },50);
+}
+function hasDetail(r){ return (r.bujichanList&&r.bujichanList.length)||(r.pinzhiList&&r.pinzhiList.length)||(r.biaoshiList&&r.biaoshiList.length); }
+function detailBlock(r){
+  var h='';
+  if (r.bujichanList&&r.bujichanList.length){ h+='<div class="detail-content-title" style="color:#D97706">不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.bujichanList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
+  if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
+  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return '影响'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（实际'+x.actStd+'×'+x.actPeople+'−系统'+x.sysStd+'×'+x.stdPeople+'）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
+  return h;
+}
+function toggleDetail(key){ showDetailId = showDetailId===key?null:key; renderDashboard(); }
+function kpiCard(bg,stroke,svg,label,value,sub){ return '<div class="kpi-card"><div class="kpi-header"><div class="kpi-icon" style="background:'+bg+'">'+svg+'</div><span class="kpi-label">'+label+'</span></div><div class="kpi-value">'+value+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+'</div>'; }
+
+// ==================== CHARTS ====================
+function setupCanvas(id){ var c=document.getElementById(id); if(!c) return null; var ctx=c.getContext("2d"); var rect=c.parentElement.getBoundingClientRect(); c.width=rect.width*2; c.height=rect.height*2; ctx.scale(2,2); return {c:c,ctx:ctx,w:rect.width,h:rect.height}; }
+function drawCovChart(id, data, metric){
+  var s=setupCanvas(id); if(!s) return; var ctx=s.ctx,w=s.w,h=s.h;
+  var rows=data.filter(function(r){ return metric==='mohu'? r.sysMohu>0 : r.sysBujichan>0; }).map(function(r){ return { name:r.label||r.teamName, rate: metric==='mohu'?r.mohuCoverage:r.bujichanCoverage }; });
+  ctx.clearRect(0,0,w,h);
+  if(!rows.length){ ctx.fillStyle="#9CA3AF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText("暂无数据",w/2,h/2); return; }
+  var pad={top:14,right:56,bottom:24,left:80}; var cw=w-pad.left-pad.right, chh=h-pad.top-pad.bottom;
+  ctx.strokeStyle="#F3F4F6"; ctx.lineWidth=1;
+  for(var i=0;i<=4;i++){ var x=pad.left+cw/4*i; ctx.beginPath(); ctx.moveTo(x,pad.top); ctx.lineTo(x,h-pad.bottom); ctx.stroke(); ctx.fillStyle="#9CA3AF"; ctx.font="10px sans-serif"; ctx.textAlign="center"; ctx.fillText((25*i)+"%",x,h-8); }
+  var gap=chh/rows.length, bh=Math.min(gap*0.6,26);
+  rows.forEach(function(r,idx){
+    var y=pad.top+gap*idx+(gap-bh)/2; var bw=Math.min(r.rate,120)/120*cw;
+    ctx.fillStyle=covColor(r.rate); ctx.beginPath(); rr(ctx,pad.left,y,bw,bh,[0,6,6,0]); ctx.fill();
+    ctx.fillStyle="#374151"; ctx.font="12px sans-serif"; ctx.textAlign="right"; ctx.fillText(r.name,pad.left-8,y+bh/2+4);
+    ctx.fillStyle="#374151"; ctx.textAlign="left"; ctx.fillText(r.rate.toFixed(0)+'%',pad.left+bw+6,y+bh/2+4);
+  });
+}
+function drawCompChart(id, pz, bs){
+  var s=setupCanvas(id); if(!s) return; var ctx=s.ctx,w=s.w,h=s.h; ctx.clearRect(0,0,w,h);
+  var total=pz+bs; if(total<=0){ ctx.fillStyle="#9CA3AF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText("暂无模糊工时数据",w/2,h/2); return; }
+  var cx=w/2-110, cy=h/2, oR=Math.min(w/2-110,h/2)-20, iR=oR*0.6;
+  var segs=[{name:"品质返工",v:pz,color:"#06B6D4"},{name:"标时不达成",v:bs,color:"#8B5CF6"}].filter(function(x){return x.v>0;});
+  var a=-Math.PI/2; segs.forEach(function(d){ var ang=d.v/total*Math.PI*2; ctx.fillStyle=d.color; ctx.beginPath(); ctx.arc(cx,cy,oR,a,a+ang); ctx.arc(cx,cy,iR,a+ang,a,true); ctx.closePath(); ctx.fill(); a+=ang; });
+  ctx.fillStyle="#111827"; ctx.font="bold 20px sans-serif"; ctx.textAlign="center"; ctx.fillText(Math.round(total)+"h",cx,cy+7);
+  ctx.fillStyle="#6B7280"; ctx.font="11px sans-serif"; ctx.fillText("总模糊工时",cx,cy+22);
+  var lx=cx+oR+55, lh=26, lt=cy-(segs.length-1)*lh/2; ctx.textAlign="left";
+  segs.forEach(function(d,i){ var ly=lt+i*lh; ctx.fillStyle=d.color; ctx.beginPath(); rr(ctx,lx,ly-6,12,12,3); ctx.fill(); ctx.fillStyle="#374151"; ctx.font="12px sans-serif"; ctx.textAlign="left"; ctx.fillText(d.name,lx+18,ly+4); ctx.fillStyle="#6B7280"; ctx.textAlign="right"; ctx.fillText(((d.v/total)*100).toFixed(0)+'% · '+Math.round(d.v)+'h',lx+175,ly+4); ctx.textAlign="left"; });
+}
+function rr(ctx,x,y,w,h,r){ if(ctx.roundRect){ ctx.roundRect(x,y,w,h,r); return; } var rad=Array.isArray(r)?r:[r,r,r,r]; ctx.moveTo(x+rad[0],y); ctx.lineTo(x+w-rad[1],y); ctx.quadraticCurveTo(x+w,y,x+w,y+rad[1]); ctx.lineTo(x+w,y+h-rad[2]); ctx.quadraticCurveTo(x+w,y+h,x+w-rad[2],y+h); ctx.lineTo(x+rad[3],y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-rad[3]); ctx.lineTo(x,y+rad[0]); ctx.quadraticCurveTo(x,y,x+rad[0],y); ctx.closePath(); }
+
+// ==================== CLOUD DATA VIEWER + ADMIN ====================
+function showCloudData(){
+  var ex=document.getElementById("cloud-overlay"); if(ex) ex.remove();
+  var ov=document.createElement('div'); ov.id='cloud-overlay'; ov.className='settings-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.onclick=function(e){ if(e.target===ov) closeCloudData(); };
+  var m=document.createElement('div'); m.className='settings-modal'; m.style.cssText='width:90%;max-width:760px;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;padding:0;';
+  m.innerHTML='<div style="padding:20px 24px 16px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px">'+iconCloud('#059669')+'<span style="font-size:17px;font-weight:700;color:#111827">云端数据管理</span></div><button data-action="closeCloudData" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9CA3AF">&times;</button></div><div id="cloud-data-content" style="padding:20px 24px;overflow-y:auto;flex:1;font-size:13px;color:#6B7280">正在加载...</div>';
+  ov.appendChild(m); document.body.appendChild(ov);
+  fetchBin(RECORDS_URL,0,function(ok,rec){ if(!ok){ document.getElementById('cloud-data-content').innerHTML='<div style="color:#DC2626">网络错误</div>'; return; } cloudRecordsCache=((rec&&rec.records)||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }); if(adminLoggedIn) showAdminPanel(); else renderCloudList(); });
+}
+function renderCloudList(){
+  var c=document.getElementById('cloud-data-content'); if(!c) return;
+  if(!cloudRecordsCache.length){ c.innerHTML='<div style="text-align:center;padding:40px 0;color:#9CA3AF">暂无云端数据</div>'; return; }
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:#374151;font-weight:600">共 '+cloudRecordsCache.length+' 条记录</span><div style="display:flex;gap:8px"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button data-action="showAdminLogin" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;border:1.5px solid #DC2626;background:#FEF2F2;font-size:12px;color:#DC2626;font-weight:600;cursor:pointer">管理</button></div></div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#F3F4F6"><th style="padding:8px 10px;text-align:left">日期</th><th style="padding:8px 10px;text-align:left">班组</th><th style="padding:8px 10px;text-align:right">不记产覆盖</th><th style="padding:8px 10px;text-align:right">模糊覆盖</th></tr></thead><tbody>';
+  cloudRecordsCache.forEach(function(r){ h+='<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 10px">'+esc(r.date)+'</td><td style="padding:8px 10px;font-weight:600">'+esc(r.teamName)+'</td><td style="padding:8px 10px;text-align:right;color:'+covColor(r.bujichanCoverage||0)+'">'+(r.bujichanCoverage!=null?r.bujichanCoverage.toFixed(0)+'%':'—')+'</td><td style="padding:8px 10px;text-align:right;color:'+covColor(r.mohuCoverage||0)+'">'+(r.mohuCoverage!=null?r.mohuCoverage.toFixed(0)+'%':'—')+'</td></tr>'; });
+  h+='</tbody></table></div>';
+  c.innerHTML=h;
+}
+function closeCloudData(){ var o=document.getElementById("cloud-overlay"); if(o) o.remove(); }
+function showAdminLogin(){
+  if(adminLoggedIn){ showAdminPanel(); return; }
+  var c=document.getElementById('cloud-data-content'); if(!c) return;
+  c.innerHTML='<div style="padding:30px 0;text-align:center"><div style="font-size:15px;font-weight:600;color:#111827;margin-bottom:16px">管理员验证</div><input id="admin-pwd-input" type="password" placeholder="请输入密码" style="width:220px;padding:10px 14px;border:1.5px solid #D1D5DB;border-radius:10px;font-size:14px;text-align:center;outline:none"/><div id="admin-pwd-error" style="color:#DC2626;font-size:12px;margin-top:8px;min-height:18px"></div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px"><button data-action="adminLogin" style="padding:10px 28px;border-radius:10px;border:none;background:#DC2626;color:#fff;font-size:13px;font-weight:600;cursor:pointer">确认</button><button data-action="backToCloudData" style="padding:10px 28px;border-radius:10px;border:1.5px solid #D1D5DB;background:#fff;color:#374151;font-size:13px;font-weight:600;cursor:pointer">返回</button></div></div>';
+  var inp=document.getElementById('admin-pwd-input'); if(inp){ inp.focus(); inp.addEventListener('keydown',function(e){ if(e.key==='Enter') adminLogin(); }); }
+}
+function adminLogin(){ var i=document.getElementById('admin-pwd-input'); var e=document.getElementById('admin-pwd-error'); if(!i) return; if(i.value===ADMIN_PASSWORD){ adminLoggedIn=true; showAdminPanel(); } else { if(e) e.textContent='密码错误'; i.value=''; i.focus(); } }
+function showAdminPanel(){
+  var c=document.getElementById('cloud-data-content'); if(!c) return;
+  var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span style="font-size:14px;font-weight:600;color:#059669">管理员模式</span></div>';
+  h+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-export" data-action="exportData">导出全部 xlsx</button></div>';
+  h+='<div style="padding:16px;border:1.5px solid #FCA5A5;border-radius:12px;background:#FEF2F2;margin-bottom:16px"><div style="font-size:14px;font-weight:600;color:#991B1B;margin-bottom:4px">清空全部采集记录</div><div style="font-size:12px;color:#6B7280;margin-bottom:12px">删除云端所有 '+cloudRecordsCache.length+' 条记录，不可恢复</div><button data-action="clearAllCloudData" style="padding:8px 20px;border-radius:8px;border:none;background:#DC2626;color:#fff;font-size:12px;font-weight:600;cursor:pointer">清空全部</button></div>';
+  h+='<div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:8px">删除单条记录</div>';
+  if(!cloudRecordsCache.length){ h+='<div style="color:#9CA3AF;font-size:12px">暂无数据</div>'; }
+  else {
+    h+='<div style="max-height:360px;overflow-y:auto">';
+    cloudRecordsCache.forEach(function(r,i){ h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #F3F4F6"><div><div style="font-weight:600;font-size:13px">'+esc(r.teamName)+' <span style="font-weight:400;color:#6B7280;font-size:12px">'+esc(r.date)+'</span></div><div style="font-size:11px;color:#6B7280">不记产'+fmtNum(r.bujichanTotal)+'/'+fmtNum(r.sysBujichan)+'h · 模糊'+fmtNum(r.mohuTotal)+'/'+fmtNum(r.sysMohu)+'h</div></div><button data-action="deleteCloudRecord" data-param="'+i+'" style="padding:4px 12px;border-radius:6px;border:1px solid #DC2626;background:#fff;color:#DC2626;font-size:11px;font-weight:600;cursor:pointer">删除</button></div>'; });
+    h+='</div>';
+  }
+  h+='<div style="text-align:center;margin-top:16px"><button data-action="backToCloudData" style="padding:8px 24px;border-radius:8px;border:1.5px solid #D1D5DB;background:#fff;color:#374151;font-size:12px;font-weight:600;cursor:pointer">返回列表</button></div>';
+  c.innerHTML=h;
+}
+
+// ---- 系统数据导入 ----
+function showSysImport(){
+  var c=document.getElementById('cloud-data-content'); if(!c) return;
+  fetchBin(SYSDATA_URL,0,function(ok,rec){
+    var list=(rec&&rec.sysdata)||[]; sysDataCache=list;
+    var cur=list.map(function(x){ return [x.teamName,x.date,x.bujichan,x.mohu].join(','); }).join('\n');
+    var h='<div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:8px">导入系统数据（后台）</div>';
+    h+='<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.7">每行一条：<code style="background:#F3F4F6;padding:1px 6px;border-radius:4px">班组,日期,不记产系统数据,模糊系统数据</code>。同班组+日期会覆盖旧值。可从 MES 导出后粘贴到此处。</div>';
+    h+='<textarea id="sys-import-text" class="settings-textarea" placeholder="一部一课,2026-09-10,120,86">'+esc(cur)+'</textarea>';
+    h+='<div id="sys-import-status" class="settings-status"></div>';
+    h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px"><button data-action="backToCloudData" style="padding:10px 24px;border-radius:10px;border:1.5px solid #D1D5DB;background:#fff;color:#374151;font-size:14px;font-weight:600;cursor:pointer">返回</button><button class="settings-btn-save" data-action="importSysData" style="padding:10px 24px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer">保存到云端</button></div>';
+    c.innerHTML=h;
+  });
+}
+function importSysData(){
+  var ta=document.getElementById('sys-import-text'); var st=document.getElementById('sys-import-status'); if(!ta) return;
+  var lines=ta.value.split(/\r?\n/); var out=[]; var bad=[];
+  lines.forEach(function(ln){ ln=ln.trim(); if(!ln) return; var p=ln.split(/[,，]/); if(p.length<4){ bad.push(ln); return; } out.push({ teamName:p[0].trim(), date:p[1].trim(), bujichan:Number(p[2])||0, mohu:Number(p[3])||0 }); });
+  if(bad.length){ st.className='settings-status error'; st.textContent='有 '+bad.length+' 行格式不正确（需4列，逗号分隔）'; return; }
+  if(!out.length){ st.className='settings-status error'; st.textContent='没有可保存的数据'; return; }
+  st.className='settings-status success'; st.textContent='正在保存...';
+  var xhr=new XMLHttpRequest(); xhr.open('PUT', SYSDATA_URL, true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr.timeout=15000;
+  xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ st.className='settings-status success'; st.textContent='已保存 '+out.length+' 条系统数据'; sysDataCache=out; } else { st.className='settings-status error'; st.textContent='保存失败 HTTP '+xhr.status; } };
+  xhr.onerror=function(){ st.className='settings-status error'; st.textContent='保存失败：网络错误'; };
+  xhr.send(JSON.stringify({sysdata:out}));
+}
+
+function deleteCloudRecord(iStr){
+  var i=parseInt(iStr,10); if(isNaN(i)||i<0||i>=cloudRecordsCache.length) return;
+  var rec=cloudRecordsCache[i]; if(!confirm('确定删除 '+rec.teamName+' '+rec.date+' 的记录吗？')) return;
+  var c=document.getElementById('cloud-data-content'); if(c) c.innerHTML='<div style="text-align:center;padding:40px 0">正在删除...</div>';
+  fetchBin(RECORDS_URL,0,function(ok,r){
+    if(!ok){ if(c) c.innerHTML='<div style="color:#DC2626">删除失败：无法访问云端</div>'; return; }
+    var list=((r&&r.records)||[]).filter(function(x){ return !(x.teamName===rec.teamName&&x.date===rec.date); });
+    var xhr=new XMLHttpRequest(); xhr.open('PUT',RECORDS_URL,true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key',JSONBIN_API_KEY); xhr.timeout=15000;
+    xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ cloudRecordsCache=cloudRecordsCache.filter(function(x){ return !(x.teamName===rec.teamName&&x.date===rec.date); }); showAdminPanel(); } else if(c) c.innerHTML='<div style="color:#DC2626">删除失败 HTTP '+xhr.status+'</div>'; };
+    xhr.onerror=function(){ if(c) c.innerHTML='<div style="color:#DC2626">删除失败：网络错误</div>'; };
+    xhr.send(JSON.stringify({records:list}));
+  });
+}
+function clearAllCloudData(){
+  if(!confirm('确定清空全部 '+cloudRecordsCache.length+' 条采集记录吗？不可恢复！')) return;
+  if(!confirm('再次确认：清空后无法找回。')) return;
+  var c=document.getElementById('cloud-data-content'); if(c) c.innerHTML='<div style="text-align:center;padding:40px 0">正在清空...</div>';
+  var xhr=new XMLHttpRequest(); xhr.open('PUT',RECORDS_URL,true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key',JSONBIN_API_KEY); xhr.timeout=15000;
+  xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ cloudRecordsCache=[]; cloudDashboardRecords=[]; if(c) c.innerHTML='<div style="text-align:center;padding:40px 0;color:#059669;font-weight:600">数据已清空</div>'; } else if(c) c.innerHTML='<div style="color:#DC2626">清空失败 HTTP '+xhr.status+'</div>'; };
+  xhr.onerror=function(){ if(c) c.innerHTML='<div style="color:#DC2626">清空失败：网络错误</div>'; };
+  xhr.send(JSON.stringify({records:[]}));
+}
+
+// ==================== XLSX EXPORT (20列，匹配分析表) ====================
+function loadSheetJS(cb){ if(window.XLSX) return cb(); var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload=function(){cb();}; s.onerror=function(){cb(true);}; document.head.appendChild(s); }
+function buildExportRow(r){
+  var row=new Array(20).fill('');
+  row[0]=r.date||''; row[1]=r.submitTime||''; row[2]=r.teamName||'';
+  row[3]=r.sysBujichan!=null?r.sysBujichan:'';
+  // 不记产明细 E-H: 姓名,岗位,工作内容,工时
+  var bj=r.bujichanList||[];
+  row[4]=bj.map(function(x){return x.name||'';}).join('；');
+  row[5]=bj.map(function(x){return x.position||'';}).join('；');
+  row[6]=bj.map(function(x){return x.content||'';}).join('；');
+  row[7]=r.bujichanTotal!=null?Number(r.bujichanTotal.toFixed(1)):(bj.reduce(function(s,x){return s+(Number(x.hours)||0);},0));
+  row[8]=r.sysMohu!=null?r.sysMohu:'';
+  // 品质返工 J-N: 品质返工工时,产品型号,人数,每人工时,原因备注
+  var pz=r.pinzhiList||[];
+  row[9]=r.pinzhiTotal!=null?Number(r.pinzhiTotal.toFixed(1)):pz.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.pinzhiList.calc(x));},0);
+  row[10]=pz.map(function(x){return x.model||'';}).join('；');
+  row[11]=pz.map(function(x){return x.people;}).join('；');
+  row[12]=pz.map(function(x){return x.hoursPerPerson;}).join('；');
+  row[13]=pz.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  // 标时不达成 O-T: 影响合计,系统标时,标时人数,实际标时,实际人数,原因备注
+  var bs=r.biaoshiList||[];
+  row[14]=r.biaoshiTotal!=null?Number(r.biaoshiTotal.toFixed(1)):bs.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.biaoshiList.calc(x));},0);
+  row[15]=bs.map(function(x){return x.sysStd;}).join('；');
+  row[16]=bs.map(function(x){return x.stdPeople;}).join('；');
+  row[17]=bs.map(function(x){return x.actStd;}).join('；');
+  row[18]=bs.map(function(x){return x.actPeople;}).join('；');
+  row[19]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  return row;
+}
+function exportTemplateXLSX(recs, filename){
+  loadSheetJS(function(failed){
+    var header1=['日期','提交时间','班组','不记产工时-系统数据','不记产工时','','','','模糊工时-系统数据','其中：品质返工','','','','','其中：标时不达成','','','','',''];
+    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','每天导入','品质返工工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','系统标时','标时人数','实际标时','实际人数','原因备注'];
+    var dataRows=recs.map(buildExportRow);
+    if(failed||!window.XLSX){
+      var csv=''+header2.join(',')+'\n'+dataRows.map(function(row){ return row.map(function(c){ var s=String(c==null?'':c); if(/[",\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }).join(','); }).join('\n');
+      var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=filename.replace('.xlsx','.csv'); document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); return;
+    }
+    var aoa=[header1,header2].concat(dataRows); var ws=XLSX.utils.aoa_to_sheet(aoa);
+    var merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},{s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:0,c:7}},{s:{r:0,c:8},e:{r:1,c:8}},{s:{r:0,c:9},e:{r:0,c:13}},{s:{r:0,c:14},e:{r:0,c:19}}];
+    ws['!merges']=merges; var widths=[]; for(var i=0;i<20;i++) widths.push({wch:i<3?12:14}); ws['!cols']=widths;
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1'); XLSX.writeFile(wb,filename);
+  });
+}
+function exportData(){
+  var src = cloudDashboardRecords.length?cloudDashboardRecords:cloudRecordsCache;
+  if(!src||!src.length){ alert('暂无数据可导出'); return; }
+  exportTemplateXLSX(src.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||TEAM_SORT.indexOf(a.teamName)-TEAM_SORT.indexOf(b.teamName); }), '模糊工时数据_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+// ==================== ICONS ====================
+function iconQ(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'; }
+function iconInfo(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'; }
+function iconList(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>'; }
+function iconGear(color){ return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'; }
+function iconCloud(color){ return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>'; }
+function iconTeam(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'; }
+function iconClock(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'; }
+function iconWarn(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'; }
+</script>
+</body>
+</html>
