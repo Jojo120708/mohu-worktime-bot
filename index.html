@@ -363,7 +363,7 @@ var SECTION_DEFS = {
   },
   biaoshiList: {
     title: "模糊工时-标时不达成明细", color: "#8B5CF6",
-    desc: "影响合计工时 = (实际标时×实际人数 − 系统标时×标时人数) × 出勤工时",
+    desc: "影响合计工时 = (系统标时×标时人数 − 实际标时×实际人数) × 出勤工时",
     fields: [
       { k: "product", l: "产品名称", t: "text" },
       { k: "sysStd", l: "系统标时", t: "num" },
@@ -375,7 +375,7 @@ var SECTION_DEFS = {
     ],
     calc: function(d){
       var att = Number(d.attHours)||0;
-      var v = ((Number(d.actStd)||0)*(Number(d.actPeople)||0) - (Number(d.sysStd)||0)*(Number(d.stdPeople)||0)) * att;
+      var v = ((Number(d.sysStd)||0)*(Number(d.stdPeople)||0) - (Number(d.actStd)||0)*(Number(d.actPeople)||0)) * att;
       return v > 0 ? v : 0; // 只统计损失（正影响）
     }
   },
@@ -1138,7 +1138,7 @@ function detailBlock(r){
   var h='';
   if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">模糊工时-临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
   if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">模糊工时-品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
-  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'影响'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（(实际'+x.actStd+'×'+x.actPeople+'−系统'+x.sysStd+'×'+x.stdPeople+')×出勤'+(x.attHours||0)+'）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
+  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'影响'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（(系统'+x.sysStd+'×'+x.stdPeople+'−实际'+x.actStd+'×'+x.actPeople+')×出勤'+(x.attHours||0)+'）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
   if (r.otherList&&r.otherList.length){ h+='<div class="detail-content-title" style="color:#EC4899">模糊工时-其他明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.otherList.map(function(x){ return x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.otherList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   return h;
 }
