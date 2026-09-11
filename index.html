@@ -334,6 +334,8 @@ var WEBHOOK_KEY = "mohu_webhook";
 
 var TEAM_OPTIONS = ["一部一课","一部二课","一部三课","二部一课","二部二课","二部三课","二部四课","二部五课","三部一课"];
 var TEAM_SORT = ["一部一课","一部二课","一部三课","二部一课","二部二课","二部三课","二部四课","二部五课","三部一课"];
+// 看板"未提交"提醒对照的应提交班组名单（可按需增删）
+var EXPECTED_TEAMS = ["一部一课","一部二课","一部三课","二部一课","二部二课","二部三课","二部四课","二部五课"];
 
 // 明细区块定义
 var SECTION_DEFS = {
@@ -1060,13 +1062,24 @@ function renderDashboard(){
   var totSysB=0,totB=0,totSysM=0,totM=0,totPZ=0,totBS=0,totOT=0,needFix=0;
   data.forEach(function(r){ totSysB+=r.sysBujichan||0; totB+=r.bujichanTotal||0; totSysM+=r.sysMohu||0; totM+=r.mohuTotal||0; totPZ+=r.pinzhiTotal||0; totBS+=r.biaoshiTotal||0; totOT+=r.otherTotal||0; if((r.sysBujichan>0&&r.bujichanCoverage<95)||(r.sysMohu>0&&r.mohuCoverage<95)) needFix++; });
   var avgB=totSysB>0?totB/totSysB*100:100, avgM=totSysM>0?totM/totSysM*100:100;
+  var submittedSet={}; data.forEach(function(r){ submittedSet[(r.label||r.teamName)]=true; });
+  var unsubmitted = EXPECTED_TEAMS.filter(function(t){ return !submittedSet[t]; });
+  var needFixTeams = data.filter(function(r){ return (r.sysBujichan>0&&r.bujichanCoverage<95)||(r.sysMohu>0&&r.mohuCoverage<95); }).map(function(r){ return r.label||r.teamName; });
 
   var html='<div class="kpi-grid">';
   html+=kpiCard('#EEF2FF','#4F46E5',iconTeam(),(dashboardTimeFilter==='day'?'班组数量':'时段数量'),data.length,'');
   html+=kpiCard('#FEF3C7','#D97706',iconClock(),'不记产覆盖率',avgB.toFixed(0)+'%','明细 '+fmtNum(totB)+'h / 系统 '+fmtNum(totSysB)+'h');
   html+=kpiCard('#F5F3FF','#7C3AED',iconClock(),'模糊覆盖率',avgM.toFixed(0)+'%','明细 '+fmtNum(totM)+'h / 系统 '+fmtNum(totSysM)+'h');
   html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','品质返工 '+fmtNum(totPZ)+'h · 标时不达成 '+fmtNum(totBS)+'h · 其他 '+fmtNum(totOT)+'h');
-  html+=kpiCard('#FEF2F2','#EF4444',iconWarn(),'待补(未达95%)',needFix,'需补充明细的班组');
+  html+=kpiCard('#FEF2F2','#EF4444',iconWarn(),'未提交班组',unsubmitted.length,'应提交 '+EXPECTED_TEAMS.length+' 个');
+  html+=kpiCard('#FFFBEB','#D97706',iconWarn(),'待补(未达95%)',needFixTeams.length,'需补充明细的班组');
+  html+='</div>';
+
+  html+='<div class="table-card" style="margin-bottom:16px;padding:16px 22px"><div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:12px">提交状态提醒'+(dashboardTimeFilter==='day'?(' · '+formatDateShort(dashboardDateFilter)):(dashboardTimeFilter==='week'?(' · '+getWeekDateRange(dashboardDateFilter)):(' · '+getMonthLabel(dashboardDateFilter))))+'</div>';
+  html+='<div style="font-size:13px;color:#6B7280;margin-bottom:8px">未提交（'+unsubmitted.length+'）：</div>';
+  html+= unsubmitted.length ? chipsHtml(unsubmitted,'#FEF2F2','#DC2626','#FECACA') : '<div style="color:#059669;font-size:13px;font-weight:600">✓ 全部已提交</div>';
+  html+='<div style="font-size:13px;color:#6B7280;margin:14px 0 8px">覆盖率待补（'+needFixTeams.length+'）：</div>';
+  html+= needFixTeams.length ? chipsHtml(needFixTeams,'#FFFBEB','#D97706','#FDE68A') : '<div style="color:#059669;font-size:13px;font-weight:600">✓ 无（已提交均达标）</div>';
   html+='</div>';
 
   html+='<div class="chart-grid">';
@@ -1117,6 +1130,7 @@ function detailBlock(r){
 }
 function toggleDetail(key){ showDetailId = showDetailId===key?null:key; renderDashboard(); }
 function kpiCard(bg,stroke,svg,label,value,sub){ return '<div class="kpi-card"><div class="kpi-header"><div class="kpi-icon" style="background:'+bg+'">'+svg+'</div><span class="kpi-label">'+label+'</span></div><div class="kpi-value">'+value+'</div>'+(sub?'<div class="kpi-sub">'+sub+'</div>':'')+'</div>'; }
+function chipsHtml(names,bg,fg,bd){ return '<div style="display:flex;flex-wrap:wrap;gap:8px">'+names.map(function(n){ return '<span style="padding:4px 12px;border-radius:8px;background:'+bg+';color:'+fg+';border:1px solid '+bd+';font-size:13px;font-weight:600">'+esc(n)+'</span>'; }).join('')+'</div>'; }
 
 // ==================== CHARTS ====================
 function setupCanvas(id){ var c=document.getElementById(id); if(!c) return null; var ctx=c.getContext("2d"); var rect=c.parentElement.getBoundingClientRect(); c.width=rect.width*2; c.height=rect.height*2; ctx.scale(2,2); return {c:c,ctx:ctx,w:rect.width,h:rect.height}; }
