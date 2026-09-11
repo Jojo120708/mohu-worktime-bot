@@ -363,21 +363,21 @@ var SECTION_DEFS = {
   },
   biaoshiList: {
     title: "模糊工时-标时不达成明细", color: "#8B5CF6",
-    desc: "影响合计工时 = (产量÷系统标时)×系统人数 − (产量÷实际标时)×实际人数",
+    desc: "影响合计工时 = 实际人数×出勤工时 − (产量÷系统标时)×系统人数",
     fields: [
       { k: "product", l: "产品名称", t: "text" },
       { k: "sysStd", l: "系统标时", t: "num" },
       { k: "sysPeople", l: "系统人数", t: "num" },
-      { k: "actStd", l: "实际标时", t: "num" },
-      { k: "actPeople", l: "实际人数", t: "num" },
       { k: "output", l: "该产品当日产量", t: "num" },
+      { k: "actPeople", l: "实际人数", t: "num" },
+      { k: "attHours", l: "出勤工时", t: "num" },
       { k: "note", l: "原因备注", t: "text" }
     ],
     calc: function(d){
       var out = Number(d.output)||0;
       var sysT = (Number(d.sysStd)||0) > 0 ? (out / Number(d.sysStd)) * (Number(d.sysPeople)||0) : 0;
-      var actT = (Number(d.actStd)||0) > 0 ? (out / Number(d.actStd)) * (Number(d.actPeople)||0) : 0;
-      var v = sysT - actT;
+      var actT = (Number(d.actPeople)||0) * (Number(d.attHours)||0);
+      var v = actT - sysT;
       return v > 0 ? v : 0; // 只统计损失（正影响）
     }
   },
@@ -920,7 +920,7 @@ function submitInterview(){
     sysMohu: sysMohu(),
     linshiList: answers.linshiList.map(function(x){ return {name:x.name,position:x.position,content:x.content,hours:Number(x.hours)||0}; }),
     pinzhiList: answers.pinzhiList.map(function(x){ return {model:x.model,people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.pinzhiList.calc(x)}; }),
-    biaoshiList: answers.biaoshiList.map(function(x){ return {product:x.product||"",sysStd:Number(x.sysStd)||0,sysPeople:Number(x.sysPeople)||0,actStd:Number(x.actStd)||0,actPeople:Number(x.actPeople)||0,output:Number(x.output)||0,note:x.note||"",hours:SECTION_DEFS.biaoshiList.calc(x)}; }),
+    biaoshiList: answers.biaoshiList.map(function(x){ return {product:x.product||"",sysStd:Number(x.sysStd)||0,sysPeople:Number(x.sysPeople)||0,output:Number(x.output)||0,actPeople:Number(x.actPeople)||0,attHours:Number(x.attHours)||0,note:x.note||"",hours:SECTION_DEFS.biaoshiList.calc(x)}; }),
     otherList: answers.otherList.map(function(x){ return {people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.otherList.calc(x)}; }),
     linshiTotal: secTotal('linshiList'),
     pinzhiTotal: secTotal('pinzhiList'),
@@ -1140,7 +1140,7 @@ function detailBlock(r){
   var h='';
   if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">模糊工时-临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
   if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">模糊工时-品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
-  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'影响'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（(产量'+(x.output||0)+'÷系统'+x.sysStd+')×'+(x.sysPeople||0)+' − (产量÷实际'+x.actStd+')×'+x.actPeople+'）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
+  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'影响'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（实际'+(x.actPeople||0)+'人×'+(x.attHours||0)+'h − (产量'+(x.output||0)+'÷系统'+(x.sysStd||0)+')×'+(x.sysPeople||0)+'人）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
   if (r.otherList&&r.otherList.length){ h+='<div class="detail-content-title" style="color:#EC4899">模糊工时-其他明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.otherList.map(function(x){ return x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.otherList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   return h;
 }
@@ -1342,15 +1342,15 @@ function buildExportRow(r){
   row[10]=pz.map(function(x){return x.people;}).join('；');
   row[11]=pz.map(function(x){return x.hoursPerPerson;}).join('；');
   row[12]=pz.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 模糊工时-标时不达成 N-U: 影响合计,产品名称,系统标时,系统人数,实际标时,实际人数,当日产量,原因备注
+  // 模糊工时-标时不达成 N-U: 影响合计,产品名称,系统标时,系统人数,当日产量,实际人数,出勤工时,原因备注
   var bs=r.biaoshiList||[];
   row[13]=r.biaoshiTotal!=null?Number(r.biaoshiTotal.toFixed(1)):bs.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.biaoshiList.calc(x));},0);
   row[14]=bs.map(function(x){return x.product||'';}).join('；');
   row[15]=bs.map(function(x){return x.sysStd;}).join('；');
   row[16]=bs.map(function(x){return x.sysPeople;}).join('；');
-  row[17]=bs.map(function(x){return x.actStd;}).join('；');
+  row[17]=bs.map(function(x){return x.output;}).join('；');
   row[18]=bs.map(function(x){return x.actPeople;}).join('；');
-  row[19]=bs.map(function(x){return x.output;}).join('；');
+  row[19]=bs.map(function(x){return x.attHours;}).join('；');
   row[20]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
   // 模糊工时-其他 V-Y: 合计工时,人数,每人工时,原因
   var ot=r.otherList||[];
@@ -1363,7 +1363,7 @@ function buildExportRow(r){
 function exportTemplateXLSX(recs, filename){
   loadSheetJS(function(failed){
     var header1=['日期','提交时间','班组','模糊工时-系统数据','模糊工时-临时不记产','','','','模糊工时-品质返工','','','','','模糊工时-标时不达成','','','','','','','','模糊工时-其他','','',''];
-    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','系统标时','系统人数','实际标时','实际人数','当日产量','原因备注','其他合计工时','人数','每人工时','原因'];
+    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','系统标时','系统人数','当日产量','实际人数','出勤工时','原因备注','其他合计工时','人数','每人工时','原因'];
     var dataRows=recs.map(buildExportRow);
     if(failed||!window.XLSX){
       var csv=''+header2.join(',')+'\n'+dataRows.map(function(row){ return row.map(function(c){ var s=String(c==null?'':c); if(/[",\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }).join(','); }).join('\n');
