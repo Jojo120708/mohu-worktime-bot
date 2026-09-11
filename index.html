@@ -966,6 +966,11 @@ function testWebhook(){
 }
 
 // ==================== DASHBOARD ====================
+function showWelcome(){
+  document.getElementById("welcome").classList.remove("hidden");
+  document.getElementById("interview").classList.add("hidden");
+  document.getElementById("dashboard").classList.add("hidden");
+}
 function showDashboard(){
   document.getElementById("welcome").classList.add("hidden");
   document.getElementById("interview").classList.add("hidden");
