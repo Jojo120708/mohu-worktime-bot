@@ -442,6 +442,10 @@ document.addEventListener('DOMContentLoaded', function() {
       case 'backToCloudData': showCloudData(); break;
       case 'showSysImport': showSysImport(); break;
       case 'importSysData': importSysData(); break;
+      case 'showSysEditor': showSysEditor(); break;
+      case 'addSysEditRow': addSysEditRow(); break;
+      case 'delSysEditRow': delSysEditRow(btn.getAttribute('data-i')); break;
+      case 'saveSysEditor': saveSysEditor(); break;
       case 'clearAllCloudData': clearAllCloudData(); break;
       case 'deleteCloudRecord': deleteCloudRecord(btn.getAttribute('data-param')); break;
     }
@@ -1192,7 +1196,7 @@ function showCloudData(){
 }
 function renderCloudList(){
   var c=document.getElementById('cloud-data-content'); if(!c) return;
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:#374151;font-weight:600">共 '+cloudRecordsCache.length+' 条采集记录</span><div style="display:flex;gap:8px"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button data-action="showAdminLogin" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;border:1.5px solid #DC2626;background:#FEF2F2;font-size:12px;color:#DC2626;font-weight:600;cursor:pointer">管理</button></div></div>';
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:#374151;font-weight:600">共 '+cloudRecordsCache.length+' 条采集记录</span><div style="display:flex;gap:8px"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button data-action="showAdminLogin" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;border:1.5px solid #DC2626;background:#FEF2F2;font-size:12px;color:#DC2626;font-weight:600;cursor:pointer">管理</button></div></div>';
   if(!cloudRecordsCache.length){ c.innerHTML=h+'<div style="text-align:center;padding:30px 0;color:#9CA3AF">暂无采集记录。可先点“导入系统数据”导入 MES 的模糊工时，再开始采访。</div>'; return; }
   h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#F3F4F6"><th style="padding:8px 10px;text-align:left">日期</th><th style="padding:8px 10px;text-align:left">班组</th><th style="padding:8px 10px;text-align:right">临时不记产</th><th style="padding:8px 10px;text-align:right">模糊覆盖</th></tr></thead><tbody>';
   cloudRecordsCache.forEach(function(r){ h+='<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 10px">'+esc(r.date)+'</td><td style="padding:8px 10px;font-weight:600">'+esc(r.teamName)+'</td><td style="padding:8px 10px;text-align:right">'+fmtNum(r.linshiTotal||0)+'h</td><td style="padding:8px 10px;text-align:right;color:'+covColor(r.mohuCoverage||0)+'">'+(r.mohuCoverage!=null?r.mohuCoverage.toFixed(0)+'%':'—')+'</td></tr>'; });
@@ -1210,7 +1214,7 @@ function adminLogin(){ var i=document.getElementById('admin-pwd-input'); var e=d
 function showAdminPanel(){
   var c=document.getElementById('cloud-data-content'); if(!c) return;
   var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span style="font-size:14px;font-weight:600;color:#059669">管理员模式</span></div>';
-  h+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-export" data-action="exportData">导出全部 xlsx</button></div>';
+  h+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button class="btn-export" data-action="exportData">导出全部 xlsx</button></div>';
   h+='<div style="padding:16px;border:1.5px solid #FCA5A5;border-radius:12px;background:#FEF2F2;margin-bottom:16px"><div style="font-size:14px;font-weight:600;color:#991B1B;margin-bottom:4px">清空全部采集记录</div><div style="font-size:12px;color:#6B7280;margin-bottom:12px">删除云端所有 '+cloudRecordsCache.length+' 条记录，不可恢复</div><button data-action="clearAllCloudData" style="padding:8px 20px;border-radius:8px;border:none;background:#DC2626;color:#fff;font-size:12px;font-weight:600;cursor:pointer">清空全部</button></div>';
   h+='<div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:8px">删除单条记录</div>';
   if(!cloudRecordsCache.length){ h+='<div style="color:#9CA3AF;font-size:12px">暂无数据</div>'; }
@@ -1278,8 +1282,8 @@ function showSysImport(){
     var list=(rec&&rec.sysdata)||[]; sysDataCache=list;
     var cur=list.map(function(x){ return [x.teamName,x.date,x.mohu].join(','); }).join('\n');
     var h='<div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:8px">导入系统数据（后台）</div>';
-    h+='<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.7">方式一：直接选择 MES 导出的 <b>xlsx 模板</b>（列：日期 / 班组 / 模糊工时-系统数据；旧模板多出的“不记产”列会自动忽略，列顺序可自动识别，自动跳过表头）。当天无模糊工时的班组不用导入。<br/>方式二：打开 xlsx 选中数据区复制后粘贴到下方文本框（每行 <code style="background:#F3F4F6;padding:1px 6px;border-radius:4px">日期, 班组, 模糊</code>，逗号或Tab分隔均可）。同班组+日期会覆盖旧值。</div>';
-    h+='<div style="margin-bottom:10px"><label for="sys-file-input" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1.5px solid #4F46E5;background:#EEF2FF;color:#4F46E5;font-size:13px;font-weight:600;cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>选择 xlsx 文件</label><input type="file" id="sys-file-input" accept=".xlsx,.xls" style="display:none"/></div>';
+    h+='<div style="font-size:12px;color:#6B7280;margin-bottom:10px;line-height:1.7">方式一：直接选择 MES 导出的 <b>xlsx 模板</b>（列：日期 / 班组 / 模糊工时-系统数据；旧模板多出的“不记产”列会自动忽略，列顺序可自动识别，自动跳过表头）。当天无模糊工时的班组不用导入。<br/>方式二：打开 xlsx 选中数据区复制后粘贴到下方文本框（每行 <code style="background:#F3F4F6;padding:1px 6px;border-radius:4px">日期, 班组, 模糊</code>，逗号或Tab分隔均可）。<br/><b>导入为合并保存</b>：只新增/更新本次文件里的「班组+日期」，其他已导入数据保持不变。要修改历史日期的模糊工时，点下方「编辑已导入数据」。</div>';
+    h+='<div style="margin-bottom:10px"><label for="sys-file-input" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;border:1.5px solid #4F46E5;background:#EEF2FF;color:#4F46E5;font-size:13px;font-weight:600;cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>选择 xlsx 文件</label> <button class="btn-ghost" data-action="showSysEditor" style="margin-left:8px">编辑已导入数据</button><input type="file" id="sys-file-input" accept=".xlsx,.xls" style="display:none"/></div>';
     h+='<textarea id="sys-import-text" class="settings-textarea" placeholder="2026-09-11,一部一课,72">'+esc(cur)+'</textarea>';
     h+='<div id="sys-import-status" class="settings-status"></div>';
     h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px"><button data-action="backToCloudData" style="padding:10px 24px;border-radius:10px;border:1.5px solid #D1D5DB;background:#fff;color:#374151;font-size:14px;font-weight:600;cursor:pointer">返回</button><button class="settings-btn-save" data-action="importSysData" style="padding:10px 24px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer">保存到云端</button></div>';
@@ -1290,14 +1294,69 @@ function showSysImport(){
 }
 function importSysData(){
   var ta=document.getElementById('sys-import-text'); var st=document.getElementById('sys-import-status'); if(!ta) return;
-  var lines=ta.value.split(/\r?\n/); var out=[]; var bad=[];
-  lines.forEach(function(ln){ ln=ln.trim(); if(!ln) return; var cells=ln.split(/[\t,，]/); var o=parseSysRow(cells); if(o) out.push(o); else bad.push(ln); });
-  if(!out.length){ st.className='settings-status error'; st.textContent='没有可保存的数据（每行需含 日期、班组、两个数值）'; return; }
-  st.className='settings-status success'; st.textContent='正在保存...';
+  var lines=ta.value.split(/\r?\n/); var incoming=[]; var bad=[];
+  lines.forEach(function(ln){ ln=ln.trim(); if(!ln) return; var cells=ln.split(/[\t,，]/); var o=parseSysRow(cells); if(o) incoming.push(o); else bad.push(ln); });
+  if(!incoming.length){ st.className='settings-status error'; st.textContent='没有可保存的数据（每行需含 日期、班组、模糊数值）'; return; }
+  st.className='settings-status success'; st.textContent='正在合并保存...';
+  // 先拉云端最新，按 班组+日期 upsert 本次数据，其他保持不变
+  fetchBin(SYSDATA_URL,0,function(ok,rec){
+    var base = ok ? ((((rec&&rec.sysdata)||[]).slice())) : sysDataCache.slice();
+    var added=0, updated=0;
+    incoming.forEach(function(nw){
+      var idx=-1; for(var i=0;i<base.length;i++){ if(base[i].teamName===nw.teamName && base[i].date===nw.date){ idx=i; break; } }
+      if(idx>=0){ base[idx].mohu=nw.mohu; updated++; } else { base.push(nw); added++; }
+    });
+    var xhr=new XMLHttpRequest(); xhr.open('PUT', SYSDATA_URL, true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr.timeout=15000;
+    xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ sysDataCache=base; sysDataAll=base; st.className='settings-status success'; st.textContent='已合并：新增 '+added+' 条、更新 '+updated+' 条，其他保持不变'+(bad.length?('（忽略 '+bad.length+' 行）'):''); } else { st.className='settings-status error'; st.textContent='保存失败 HTTP '+xhr.status; } };
+    xhr.onerror=function(){ st.className='settings-status error'; st.textContent='保存失败：网络错误'; };
+    xhr.send(JSON.stringify({sysdata:base}));
+  });
+}
+
+// ---- 编辑已导入系统数据 ----
+function showSysEditor(){
+  var c=document.getElementById('cloud-data-content'); if(!c) return;
+  fetchBin(SYSDATA_URL,0,function(ok,rec){
+    var list=(((rec&&rec.sysdata)||[]).slice()).sort(function(a,b){ return (b.date||'').localeCompare(a.date||'') || (a.teamName||'').localeCompare(b.teamName||''); });
+    sysDataCache=list; sysDataAll=list;
+    var h='<div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:8px">编辑已导入系统数据</div>';
+    h+='<div style="font-size:12px;color:#6B7280;margin-bottom:10px">直接修改某「班组+日期」的模糊工时数值，或删除某行、或新增一行；点「保存到云端」写回。此操作会整体覆盖系统数据表，请以当前列表为准。</div>';
+    h+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:12px;color:#9CA3AF"><span style="flex:2">班组</span><span style="flex:2">日期</span><span style="flex:1">模糊工时</span><span style="width:52px"></span></div>';
+    h+='<div id="sys-edit-rows"></div>';
+    h+='<button class="btn-add-card" data-action="addSysEditRow" style="margin:6px 0 12px">+ 新增一行</button>';
+    h+='<div id="sys-edit-status" class="settings-status"></div>';
+    h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px"><button data-action="showSysImport" style="padding:10px 24px;border-radius:10px;border:1.5px solid #D1D5DB;background:#fff;color:#374151;font-size:14px;font-weight:600;cursor:pointer">返回导入</button><button class="settings-btn-save" data-action="saveSysEditor" style="padding:10px 24px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer">保存到云端</button></div>';
+    c.innerHTML=h;
+    window.__sysEditRows = list.map(function(x){ return {teamName:x.teamName,date:x.date,mohu:x.mohu}; });
+    renderSysEditRows();
+  });
+}
+function renderSysEditRows(){
+  var box=document.getElementById('sys-edit-rows'); if(!box) return;
+  var rows=window.__sysEditRows||[]; var h='';
+  rows.forEach(function(r,i){
+    h+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">';
+    h+='<input class="settings-input" style="flex:2" value="'+esc(r.teamName)+'" data-edit-i="'+i+'" data-edit-k="teamName" placeholder="班组"/>';
+    h+='<input class="settings-input" style="flex:2" type="date" value="'+esc(r.date)+'" data-edit-i="'+i+'" data-edit-k="date"/>';
+    h+='<input class="settings-input" style="flex:1" type="number" value="'+esc(r.mohu)+'" data-edit-i="'+i+'" data-edit-k="mohu" placeholder="模糊"/>';
+    h+='<button data-action="delSysEditRow" data-i="'+i+'" style="width:52px;padding:6px 0;border:1px solid #DC2626;color:#DC2626;background:#fff;border-radius:8px;font-size:12px;cursor:pointer">删</button>';
+    h+='</div>';
+  });
+  if(!rows.length) h='<div style="color:#9CA3AF;font-size:13px;padding:10px 0">暂无数据，点下方“新增一行”</div>';
+  box.innerHTML=h;
+}
+function collectSysEdit(){ document.querySelectorAll('#sys-edit-rows [data-edit-i]').forEach(function(inp){ var i=Number(inp.getAttribute('data-edit-i')); var k=inp.getAttribute('data-edit-k'); if(window.__sysEditRows[i]){ window.__sysEditRows[i][k] = k==='mohu'?(Number(inp.value)||0):inp.value; } }); }
+function addSysEditRow(){ collectSysEdit(); window.__sysEditRows.push({teamName:'',date:'',mohu:0}); renderSysEditRows(); }
+function delSysEditRow(i){ collectSysEdit(); window.__sysEditRows.splice(Number(i),1); renderSysEditRows(); }
+function saveSysEditor(){
+  collectSysEdit();
+  var rows=(window.__sysEditRows||[]).filter(function(r){ return r.teamName && r.date; });
+  var st=document.getElementById('sys-edit-status');
+  if(st){ st.className='settings-status success'; st.textContent='正在保存...'; }
   var xhr=new XMLHttpRequest(); xhr.open('PUT', SYSDATA_URL, true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr.timeout=15000;
-  xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ st.className='settings-status success'; st.textContent='已保存 '+out.length+' 条系统数据'+(bad.length?('（忽略 '+bad.length+' 行）'):''); sysDataCache=out; sysDataAll=out; } else { st.className='settings-status error'; st.textContent='保存失败 HTTP '+xhr.status; } };
-  xhr.onerror=function(){ st.className='settings-status error'; st.textContent='保存失败：网络错误'; };
-  xhr.send(JSON.stringify({sysdata:out}));
+  xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ sysDataCache=rows; sysDataAll=rows; if(st){ st.className='settings-status success'; st.textContent='已保存 '+rows.length+' 条'; } } else if(st){ st.className='settings-status error'; st.textContent='保存失败 HTTP '+xhr.status; } };
+  xhr.onerror=function(){ if(st){ st.className='settings-status error'; st.textContent='保存失败：网络错误'; } };
+  xhr.send(JSON.stringify({sysdata:rows}));
 }
 
 function deleteCloudRecord(iStr){
