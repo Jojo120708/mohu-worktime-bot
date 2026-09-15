@@ -750,7 +750,7 @@ function sectionBlockHtml(section){
     html+='<div class="detail-card" style="border:1px solid '+def.color+'30;background:'+def.color+'08">';
     html+='<div class="detail-card-head"><span class="detail-card-title" style="color:'+def.color+'">条目 '+(idx+1)+'</span>';
     html+='<span class="field-calc" style="color:'+def.color+';margin-left:auto">工时：<span id="calc-'+section+'-'+idx+'">'+fmtNum(def.calc(item))+'</span> h</span>';
-    html+='<button class="detail-card-del" data-action="delCard" data-section="'+section+'" data-idx="'+idx+'"'+(list.length<=1?' disabled':'')+'>删除</button>';
+    html+='<button class="detail-card-del" data-action="delCard" data-section="'+section+'" data-idx="'+idx+'">删除</button>';
     html+='</div>';
     def.fields.forEach(function(f){
       var val=item[f.k]; if(val==null) val="";
@@ -787,8 +787,8 @@ function addCard(section){
 }
 function delCard(section, idx){
   saveFieldValues();
-  if (answers[section].length<=1) return;
   answers[section].splice(idx,1);
+  if (answers[section].length===0 && answers.sel) answers.sel[section]=false;
   renderInterview();
 }
 function saveFieldValues(){
