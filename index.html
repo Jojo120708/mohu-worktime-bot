@@ -1074,6 +1074,24 @@ function sysTotalsForView(){
   inView.forEach(function(s){ m+=Number(s.mohu)||0; });
   return {mohu:m};
 }
+function inViewDate(date){
+  if(!date) return false;
+  if(dashboardTimeFilter==='day') return date===dashboardDateFilter;
+  if(dashboardTimeFilter==='week') return getISOWeek(date)===dashboardDateFilter;
+  return getMonthKey(date)===dashboardDateFilter;
+}
+function computeUnsubmitted(){
+  var submitted={};
+  cloudDashboardRecords.forEach(function(r){ if(r.teamName && r.date) submitted[r.teamName+'|'+r.date]=true; });
+  var missSet={}, order=[];
+  sysDataAll.forEach(function(s){
+    if(!s || !s.date || !s.teamName) return;
+    if((Number(s.mohu)||0)<=0) return;   // 当天无模糊工时的班组不算应交
+    if(!inViewDate(s.date)) return;
+    if(!submitted[s.teamName+'|'+s.date]){ if(!missSet[s.teamName]){ missSet[s.teamName]=true; order.push(s.teamName); } }
+  });
+  return order;
+}
 function renderDashboard(){
   var data=aggregate(cloudDashboardRecords, dashboardTimeFilter);
   data.sort(function(a,b){ var ai=TEAM_SORT.indexOf(a.teamName),bi=TEAM_SORT.indexOf(b.teamName); if(ai<0)ai=99; if(bi<0)bi=99; if(ai!==bi) return ai-bi; return (a.date||"").localeCompare(b.date||""); });
@@ -1087,9 +1105,8 @@ function renderDashboard(){
   data.forEach(function(r){ totSysM+=r.sysMohu||0; totM+=r.mohuTotal||0; totLS+=r.linshiTotal||0; totPZ+=r.pinzhiTotal||0; totBS+=r.biaoshiTotal||0; totOT+=r.otherTotal||0; });
   var sysT=sysTotalsForView();
   var avgM=sysT.mohu>0?totM/sysT.mohu*100:100;
-  var submittedSet={}; data.forEach(function(r){ submittedSet[(r.label||r.teamName)]=true; });
   var expectedTeams = sysTeamsForView();
-  var unsubmitted = expectedTeams.filter(function(t){ return !submittedSet[t]; });
+  var unsubmitted = computeUnsubmitted();
   var needFixTeams = data.filter(function(r){ return (r.sysMohu>0&&r.mohuCoverage<95); }).map(function(r){ return r.label||r.teamName; });
 
   var html='<div class="kpi-grid">';
