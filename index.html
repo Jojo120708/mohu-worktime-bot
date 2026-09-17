@@ -1131,12 +1131,13 @@ function renderDashboard(){
   // table
   var isDay=dashboardTimeFilter==='day';
   html+='<div class="table-card"><div class="table-header"><h3>数据明细</h3><span>'+(isDay?data.length+' 条记录':data.length+' 个班组')+'</span><button class="btn-export" data-action="exportData" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出明细</button></div>';
-  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>模糊系统</th><th>临时不记产</th><th>品质返工</th><th>标时不达成</th><th>其他</th><th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
+  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>提交时间</th><th>模糊系统</th><th>临时不记产</th><th>品质返工</th><th>标时不达成</th><th>其他</th><th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
   data.forEach(function(r){
     var ok=r.sysMohu<=0||r.mohuCoverage>=95;
     html+='<tr>';
     html+='<td style="font-weight:600;color:#111827">'+esc(r.label||r.teamName)+'</td>';
     if(isDay) html+='<td style="color:#6B7280;white-space:nowrap">'+esc(r.date)+'</td>';
+    html+='<td style="color:#6B7280;font-size:12px;white-space:nowrap">'+esc(r.submitTime||'—')+'</td>';
     html+='<td>'+fmtNum(r.sysMohu)+'</td>';
     html+='<td>'+fmtNum(r.linshiTotal||0)+'</td>';
     html+='<td>'+fmtNum(r.pinzhiTotal)+'</td>';
@@ -1148,7 +1149,7 @@ function renderDashboard(){
     html+='</tr>';
     var rk=esc(r.key||r.teamName+'|'+r.date);
     if (showDetailId===rk && hasDetail(r)){
-      html+='<tr class="detail-row"><td colspan="'+(isDay?10:9)+'"><div class="detail-content">'+detailBlock(r)+'</div></td></tr>';
+      html+='<tr class="detail-row"><td colspan="'+(isDay?11:10)+'"><div class="detail-content">'+detailBlock(r)+'</div></td></tr>';
     }
   });
   html+='</tbody></table></div></div>';
