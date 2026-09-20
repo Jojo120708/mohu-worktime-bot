@@ -363,21 +363,19 @@ var SECTION_DEFS = {
   },
   biaoshiList: {
     title: "模糊工时-标时不达成明细", color: "#8B5CF6",
-    desc: "影响合计工时 = 实际人数×出勤工时 − (产量÷系统标时)×系统人数",
+    desc: "不达成工时 = (计划量 − 生产数量) ÷ 标时 × 人数",
     fields: [
       { k: "product", l: "产品名称", t: "text" },
-      { k: "sysStd", l: "系统标时", t: "num" },
-      { k: "sysPeople", l: "系统人数", t: "num" },
-      { k: "output", l: "该产品当日产量", t: "num" },
-      { k: "actPeople", l: "实际人数", t: "num" },
-      { k: "attHours", l: "出勤工时", t: "num" },
+      { k: "plan", l: "计划量", t: "num" },
+      { k: "actual", l: "生产数量", t: "num" },
+      { k: "std", l: "标时", t: "num" },
+      { k: "people", l: "人数", t: "num" },
       { k: "note", l: "原因备注", t: "text" }
     ],
     calc: function(d){
-      var out = Number(d.output)||0;
-      var sysT = (Number(d.sysStd)||0) > 0 ? (out / Number(d.sysStd)) * (Number(d.sysPeople)||0) : 0;
-      var actT = (Number(d.actPeople)||0) * (Number(d.attHours)||0);
-      var v = actT - sysT;
+      var p = Number(d.plan)||0, a = Number(d.actual)||0, s = Number(d.std)||0, pp = Number(d.people)||0;
+      if (s <= 0) return 0;
+      var v = (p - a) / s * pp;
       return v > 0 ? v : 0; // 只统计损失（正影响）
     }
   },
@@ -729,6 +727,7 @@ function renderDetailsStep(card){
   html+='<div id="nav-container"></div>';
   card.innerHTML=html;
   card.querySelectorAll('.field-input').forEach(function(inp){ inp.addEventListener('input', function(){ onFieldInput(this); }); });
+  var pf=document.getElementById('prod-file-input'); if(pf) pf.addEventListener('change', function(){ onProdFilePicked(this); });
   renderNavButtons();
   updateValidationMsg();
 }
@@ -760,6 +759,9 @@ function sectionBlockHtml(section){
     html+='</div>';
   });
   html+='<button class="btn-add-card" data-action="addCard" data-section="'+section+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> 添加一条'+SEL_LABELS[section]+'</button>';
+  if(section==='biaoshiList'){
+    html+='<label for="prod-file-input" class="btn-add-card" style="border-color:#8B5CF6;color:#8B5CF6;margin-top:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> 导入生产达成表(xlsx)</label><input type="file" id="prod-file-input" accept=".xlsx,.xls" style="display:none"/>';
+  }
   html+='</div>';
   return html;
 }
@@ -790,6 +792,76 @@ function delCard(section, idx){
   answers[section].splice(idx,1);
   if (answers[section].length===0 && answers.sel) answers.sel[section]=false;
   renderInterview();
+}
+
+// ---- 导入生产达成表 → 标时不达成 ----
+function _pn(v){ var n=parseFloat(String(v==null?'':v).replace(/[,%\s]/g,'')); return isNaN(n)?0:n; }
+function onProdFilePicked(input){
+  var f=input.files && input.files[0]; if(!f) return;
+  loadXLSXLib(function(ok){
+    if(!ok){ alert('Excel解析库加载失败，请改用逐条录入'); input.value=''; return; }
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var entries=[];
+      try{
+        var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        entries=parseProdWorkbook(wb);
+      }catch(err){ alert('解析失败：'+err.message); input.value=''; return; }
+      if(!entries.length){ alert('未解析到"不达成"产品（需 达成率<100%、标时>0、人数>0 的行）'); input.value=''; return; }
+      saveFieldValues();
+      answers.biaoshiList = answers.biaoshiList.filter(function(x){ return x.product||x.plan||x.actual||x.std||x.people; });
+      entries.forEach(function(en){ answers.biaoshiList.push(en); });
+      renderInterview();
+      showCloudToast('已导入 '+entries.length+' 条不达成产品','success');
+      input.value='';
+    };
+    reader.onerror=function(){ alert('读取文件失败'); input.value=''; };
+    reader.readAsArrayBuffer(f);
+  });
+}
+function parseProdWorkbook(wb){
+  var out=[];
+  (wb.SheetNames||[]).forEach(function(sn){
+    var ws=wb.Sheets[sn]; if(!ws) return;
+    var aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+    (ws['!merges']||[]).forEach(function(m){
+      var v = (aoa[m.s.r] && aoa[m.s.r][m.s.c]!=null) ? aoa[m.s.r][m.s.c] : "";
+      for(var r=m.s.r;r<=m.e.r;r++){ if(!aoa[r]) aoa[r]=[]; for(var c=m.s.c;c<=m.e.c;c++){ aoa[r][c]=v; } }
+    });
+    var headRow=-1, kind=null;
+    for(var i=0;i<Math.min(6,aoa.length);i++){
+      var joined=(aoa[i]||[]).map(function(x){return String(x);}).join('|');
+      if(joined.indexOf('系统标时')>=0 && joined.indexOf('白班计划')>=0){ headRow=i; kind='dianhan'; break; }
+      if(joined.indexOf('品名')>=0 && joined.indexOf('生产数量')>=0){ headRow=i; kind='dachong'; break; }
+    }
+    if(headRow<0) return;
+    var hdr=(aoa[headRow]||[]).map(function(x){return String(x).trim();});
+    function col(name){ for(var j=0;j<hdr.length;j++){ if(hdr[j]===name) return j; } return -1; }
+    function colHas(sub){ for(var j=0;j<hdr.length;j++){ if(hdr[j].indexOf(sub)>=0) return j; } return -1; }
+    if(kind==='dachong'){
+      var cProd=col('品名'), cPlan=col('计划量'), cStd=col('标时'), cPpl=col('人员'), cAct=col('生产数量'), cNote=colHas('未达成原因');
+      for(var r=headRow+1;r<aoa.length;r++){
+        var row=aoa[r]||[]; var prod=String(row[cProd]==null?'':row[cProd]).trim(); if(!prod) continue;
+        var plan=_pn(row[cPlan]), std=_pn(row[cStd]), ppl=_pn(row[cPpl]), act=_pn(row[cAct]);
+        if(std<=0||ppl<=0||plan<=0) continue;
+        var loss=(plan-act)/std*ppl;
+        if(loss>0.05) out.push({product:prod, plan:plan, actual:act, std:std, people:ppl, note:String(row[cNote]==null?'':row[cNote]).trim()});
+      }
+    } else {
+      var cP=colHas('产品名称'); if(cP<0) cP=1;
+      var cS=col('系统标时'), cWP=col('白班计划'), cWA=col('白班实际产量'), cWPp=col('白班人数'), cNP=col('夜班计划'), cNA=col('夜班实际产量'), cNPp=col('夜班人数'), cNt=colHas('未达成原因');
+      for(var r2=headRow+1;r2<aoa.length;r2++){
+        var rw=aoa[r2]||[]; var pr=String(rw[cP]==null?'':rw[cP]).trim(); if(!pr) continue;
+        var std2=_pn(rw[cS]); if(std2<=0) continue;
+        var note2=String(rw[cNt]==null?'':rw[cNt]).trim();
+        var wp=_pn(rw[cWP]), wa=_pn(rw[cWA]), wpp=_pn(rw[cWPp]);
+        if(wp>0&&wpp>0){ var wl=(wp-wa)/std2*wpp; if(wl>0.05) out.push({product:pr,plan:wp,actual:wa,std:std2,people:wpp,note:note2}); }
+        var np=_pn(rw[cNP]), na=_pn(rw[cNA]), npp=_pn(rw[cNPp]);
+        if(np>0&&npp>0){ var nl=(np-na)/std2*npp; if(nl>0.05) out.push({product:pr,plan:np,actual:na,std:std2,people:npp,note:note2}); }
+      }
+    }
+  });
+  return out;
 }
 function saveFieldValues(){
   document.querySelectorAll('.field-input').forEach(function(inp){
@@ -924,7 +996,7 @@ function submitInterview(){
     sysMohu: sysMohu(),
     linshiList: answers.linshiList.map(function(x){ return {name:x.name,position:x.position,content:x.content,hours:Number(x.hours)||0}; }),
     pinzhiList: answers.pinzhiList.map(function(x){ return {model:x.model,people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.pinzhiList.calc(x)}; }),
-    biaoshiList: answers.biaoshiList.map(function(x){ return {product:x.product||"",sysStd:Number(x.sysStd)||0,sysPeople:Number(x.sysPeople)||0,output:Number(x.output)||0,actPeople:Number(x.actPeople)||0,attHours:Number(x.attHours)||0,note:x.note||"",hours:SECTION_DEFS.biaoshiList.calc(x)}; }),
+    biaoshiList: answers.biaoshiList.map(function(x){ return {product:x.product||"",plan:Number(x.plan)||0,actual:Number(x.actual)||0,std:Number(x.std)||0,people:Number(x.people)||0,note:x.note||"",hours:SECTION_DEFS.biaoshiList.calc(x)}; }),
     otherList: answers.otherList.map(function(x){ return {people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.otherList.calc(x)}; }),
     linshiTotal: secTotal('linshiList'),
     pinzhiTotal: secTotal('pinzhiList'),
@@ -1162,7 +1234,7 @@ function detailBlock(r){
   var h='';
   if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">模糊工时-临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
   if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">模糊工时-品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
-  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'影响'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（实际'+(x.actPeople||0)+'人×'+(x.attHours||0)+'h − (产量'+(x.output||0)+'÷系统'+(x.sysStd||0)+')×'+(x.sysPeople||0)+'人）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
+  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'不达成'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（('+x.plan+'−'+x.actual+')÷'+x.std+'×'+x.people+'人）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
   if (r.otherList&&r.otherList.length){ h+='<div class="detail-content-title" style="color:#EC4899">模糊工时-其他明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.otherList.map(function(x){ return x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.otherList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   return h;
 }
@@ -1405,7 +1477,7 @@ function clearAllCloudData(){
 // ==================== XLSX EXPORT (20列，匹配分析表) ====================
 function loadSheetJS(cb){ if(window.XLSX) return cb(); var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload=function(){cb();}; s.onerror=function(){cb(true);}; document.head.appendChild(s); }
 function buildExportRow(r){
-  var row=new Array(25).fill('');
+  var row=new Array(24).fill('');
   row[0]=r.date||''; row[1]=r.submitTime||''; row[2]=r.teamName||'';
   row[3]=r.sysMohu!=null?r.sysMohu:'';
   // 模糊工时-临时不记产 E-H: 姓名,岗位,工作内容,工时
@@ -1421,36 +1493,35 @@ function buildExportRow(r){
   row[10]=pz.map(function(x){return x.people;}).join('；');
   row[11]=pz.map(function(x){return x.hoursPerPerson;}).join('；');
   row[12]=pz.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 模糊工时-标时不达成 N-U: 影响合计,产品名称,系统标时,系统人数,当日产量,实际人数,出勤工时,原因备注
+  // 模糊工时-标时不达成 N-T: 影响合计,产品名称,计划量,生产数量,标时,人数,原因备注
   var bs=r.biaoshiList||[];
   row[13]=r.biaoshiTotal!=null?Number(r.biaoshiTotal.toFixed(1)):bs.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.biaoshiList.calc(x));},0);
   row[14]=bs.map(function(x){return x.product||'';}).join('；');
-  row[15]=bs.map(function(x){return x.sysStd;}).join('；');
-  row[16]=bs.map(function(x){return x.sysPeople;}).join('；');
-  row[17]=bs.map(function(x){return x.output;}).join('；');
-  row[18]=bs.map(function(x){return x.actPeople;}).join('；');
-  row[19]=bs.map(function(x){return x.attHours;}).join('；');
-  row[20]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 模糊工时-其他 V-Y: 合计工时,人数,每人工时,原因
+  row[15]=bs.map(function(x){return x.plan;}).join('；');
+  row[16]=bs.map(function(x){return x.actual;}).join('；');
+  row[17]=bs.map(function(x){return x.std;}).join('；');
+  row[18]=bs.map(function(x){return x.people;}).join('；');
+  row[19]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  // 模糊工时-其他 U-X: 合计工时,人数,每人工时,原因
   var ot=r.otherList||[];
-  row[21]=r.otherTotal!=null?Number(r.otherTotal.toFixed(1)):ot.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.otherList.calc(x));},0);
-  row[22]=ot.map(function(x){return x.people;}).join('；');
-  row[23]=ot.map(function(x){return x.hoursPerPerson;}).join('；');
-  row[24]=ot.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  row[20]=r.otherTotal!=null?Number(r.otherTotal.toFixed(1)):ot.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.otherList.calc(x));},0);
+  row[21]=ot.map(function(x){return x.people;}).join('；');
+  row[22]=ot.map(function(x){return x.hoursPerPerson;}).join('；');
+  row[23]=ot.map(function(x){return x.note||'';}).filter(Boolean).join('；');
   return row;
 }
 function exportTemplateXLSX(recs, filename){
   loadSheetJS(function(failed){
-    var header1=['日期','提交时间','班组','模糊工时-系统数据','模糊工时-临时不记产','','','','模糊工时-品质返工','','','','','模糊工时-标时不达成','','','','','','','','模糊工时-其他','','',''];
-    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','系统标时','系统人数','当日产量','实际人数','出勤工时','原因备注','其他合计工时','人数','每人工时','原因'];
+    var header1=['日期','提交时间','班组','模糊工时-系统数据','模糊工时-临时不记产','','','','模糊工时-品质返工','','','','','模糊工时-标时不达成','','','','','','模糊工时-其他','','',''];
+    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因'];
     var dataRows=recs.map(buildExportRow);
     if(failed||!window.XLSX){
       var csv=''+header2.join(',')+'\n'+dataRows.map(function(row){ return row.map(function(c){ var s=String(c==null?'':c); if(/[",\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }).join(','); }).join('\n');
       var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=filename.replace('.xlsx','.csv'); document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); return;
     }
     var aoa=[header1,header2].concat(dataRows); var ws=XLSX.utils.aoa_to_sheet(aoa);
-    var merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},{s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:0,c:7}},{s:{r:0,c:8},e:{r:0,c:12}},{s:{r:0,c:13},e:{r:0,c:20}},{s:{r:0,c:21},e:{r:0,c:24}}];
-    ws['!merges']=merges; var widths=[]; for(var i=0;i<25;i++) widths.push({wch:i<3?12:14}); ws['!cols']=widths;
+    var merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},{s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:0,c:7}},{s:{r:0,c:8},e:{r:0,c:12}},{s:{r:0,c:13},e:{r:0,c:19}},{s:{r:0,c:20},e:{r:0,c:23}}];
+    ws['!merges']=merges; var widths=[]; for(var i=0;i<24;i++) widths.push({wch:i<3?12:14}); ws['!cols']=widths;
     var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1'); XLSX.writeFile(wb,filename);
   });
 }
