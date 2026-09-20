@@ -838,7 +838,7 @@ function parseProdWorkbook(wb){
     var hdr=(aoa[headRow]||[]).map(function(x){return String(x).trim();});
     function col(name){ for(var j=0;j<hdr.length;j++){ if(hdr[j]===name) return j; } return -1; }
     function colHas(sub){ for(var j=0;j<hdr.length;j++){ if(hdr[j].indexOf(sub)>=0) return j; } return -1; }
-    var groups={}, order=[];
+    var groups={}, order=[], linePeople={};
     function addGroup(key, prod, line, plan, act, std, ppl, note){
       var g=groups[key];
       if(!g){ g={product:prod, line:line, plan:0, actual:0, std:0, people:0, note:''}; groups[key]=g; order.push(key); }
@@ -849,10 +849,12 @@ function parseProdWorkbook(wb){
     }
     if(kind==='dachong'){
       var cLine=col('生产线'), cProd=col('品名'), cPlan=col('计划量'), cStd=col('标时'), cPpl=col('人员'), cAct=col('生产数量'), cNote=colHas('未达成原因');
+      var lastLineDC='';
       for(var r=headRow+1;r<aoa.length;r++){
         var row=aoa[r]||[]; var prod=String(row[cProd]==null?'':row[cProd]).trim(); if(!prod) continue;
-        var line=String(row[cLine]==null?'':row[cLine]).trim();
+        var rawL=String(row[cLine]==null?'':row[cLine]).trim(); if(rawL) lastLineDC=rawL; var line=lastLineDC;
         var plan=_pn(row[cPlan]), std=_pn(row[cStd]), ppl=_pn(row[cPpl]), act=_pn(row[cAct]);
+        if(!linePeople[line]){ var lp2=_pn(row[cPpl]); if(lp2>0) linePeople[line]=lp2; }
         if(plan<=0 && act<=0) continue;
         addGroup('DC|'+line+'|'+prod, prod, line, plan, act, std, ppl, String(row[cNote]==null?'':row[cNote]).trim());
       }
@@ -860,19 +862,21 @@ function parseProdWorkbook(wb){
       var cLine2=col('线 别'); if(cLine2<0) cLine2=colHas('线'); if(cLine2<0) cLine2=0;
       var cP=colHas('产品名称'); if(cP<0) cP=1;
       var cS=col('系统标时'), cWP=col('白班计划'), cWA=col('白班实际产量'), cWPp=col('白班人数'), cNP=col('夜班计划'), cNA=col('夜班实际产量'), cNPp=col('夜班人数'), cNt=colHas('未达成原因');
+      var lastLine='';
       for(var r2=headRow+1;r2<aoa.length;r2++){
-        var rw=aoa[r2]||[]; var pr=String(rw[cP]==null?'':rw[cP]).trim(); if(!pr) continue;
-        var ln=String(rw[cLine2]==null?'':rw[cLine2]).trim();
+        var rw=aoa[r2]||[];
+        var rawLine=String(rw[cLine2]==null?'':rw[cLine2]).trim(); if(rawLine) lastLine=rawLine;
+        var ln=lastLine;
+        var pr=String(rw[cP]==null?'':rw[cP]).trim(); if(!pr) continue;
         var std2=_pn(rw[cS]);
+        if(!linePeople[ln]){ var lp=_pn(rw[cWPp])||_pn(rw[cNPp]); if(lp>0) linePeople[ln]=lp; }
         var wp=_pn(rw[cWP]), wa=_pn(rw[cWA]), np=_pn(rw[cNP]), na=_pn(rw[cNA]);
-        var wpp=_pn(rw[cWPp]), npp=_pn(rw[cNPp]);
-        var ppl2 = wpp>0?wpp:npp;
         var plan2=wp+np, act2=wa+na;
         if(plan2<=0 && act2<=0) continue;
-        addGroup('DH|'+ln+'|'+pr, pr, ln, plan2, act2, std2, ppl2, String(rw[cNt]==null?'':rw[cNt]).trim());
+        addGroup('DH|'+ln+'|'+pr, pr, ln, plan2, act2, std2, 0, String(rw[cNt]==null?'':rw[cNt]).trim());
       }
     }
-    order.forEach(function(k){ var g=groups[k]; if(g.std<=0||g.people<=0) return; var loss=(g.plan-g.actual)/g.std*g.people; if(loss>0.05) out.push({product:g.product, plan:g.plan, actual:g.actual, std:g.std, people:g.people, note:g.note}); });
+    order.forEach(function(k){ var g=groups[k]; var ppl=g.people>0?g.people:(linePeople[g.line]||0); if(g.std<=0||ppl<=0) return; var loss=(g.plan-g.actual)/g.std*ppl; if(loss>0.05) out.push({product:g.product, plan:g.plan, actual:g.actual, std:g.std, people:ppl, note:g.note}); });
   });
   return out;
 }
