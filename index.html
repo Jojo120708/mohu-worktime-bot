@@ -367,7 +367,7 @@ var SECTION_DEFS = {
     fields: [
       { k: "product", l: "产品名称", t: "text" },
       { k: "plan", l: "计划量", t: "num" },
-      { k: "actual", l: "生产数量", t: "num" },
+      { k: "actual", l: "生产数量", t: "num", z: 1 },
       { k: "std", l: "标时", t: "num" },
       { k: "people", l: "人数", t: "num" },
       { k: "note", l: "原因备注", t: "text" }
@@ -896,7 +896,7 @@ function cardMissing(section, item){
   def.fields.forEach(function(f){
     var v=item[f.k];
     if (f.t==='text'){ if(v==null||String(v).trim()==="") miss.push(f.l); }
-    else { if(v==null||v===""||Number(v)<=0) miss.push(f.l); }
+    else { if(!f.z && (v==null||v===""||Number(v)<=0)) miss.push(f.l); }
   });
   return miss;
 }
