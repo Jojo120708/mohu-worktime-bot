@@ -838,25 +838,25 @@ function parseProdWorkbook(wb){
     var hdr=(aoa[headRow]||[]).map(function(x){return String(x).trim();});
     function col(name){ for(var j=0;j<hdr.length;j++){ if(hdr[j]===name) return j; } return -1; }
     function colHas(sub){ for(var j=0;j<hdr.length;j++){ if(hdr[j].indexOf(sub)>=0) return j; } return -1; }
-    var groups={}, order=[], linePeople={};
-    function addGroup(key, prod, line, plan, act, std, ppl, note){
+    var groups={}, order=[], lineWP={}, lineNP={}, prodPpl={};
+    function addGroup(key, prod, line, shift, plan, act, std, note){
       var g=groups[key];
-      if(!g){ g={product:prod, line:line, plan:0, actual:0, std:0, people:0, note:''}; groups[key]=g; order.push(key); }
+      if(!g){ g={product:prod, line:line, shift:shift, plan:0, actual:0, std:0, note:''}; groups[key]=g; order.push(key); }
       g.plan+=plan; g.actual+=act;
       if(!g.std && std>0) g.std=std;
-      if(!g.people && ppl>0) g.people=ppl;
       if(!g.note && note) g.note=note;
     }
     if(kind==='dachong'){
-      var cLine=col('生产线'), cProd=col('品名'), cPlan=col('计划量'), cStd=col('标时'), cPpl=col('人员'), cAct=col('生产数量'), cNote=colHas('未达成原因');
+      var cLine=col('生产线'), cProd=col('品名'), cShift=col('班次'), cPlan=col('计划量'), cStd=col('标时'), cPpl=col('人员'), cAct=col('生产数量'), cNote=colHas('未达成原因');
       var lastLineDC='';
       for(var r=headRow+1;r<aoa.length;r++){
         var row=aoa[r]||[]; var prod=String(row[cProd]==null?'':row[cProd]).trim(); if(!prod) continue;
         var rawL=String(row[cLine]==null?'':row[cLine]).trim(); if(rawL) lastLineDC=rawL; var line=lastLineDC;
+        var shift=String(row[cShift]==null?'':row[cShift]).trim();
         var plan=_pn(row[cPlan]), std=_pn(row[cStd]), ppl=_pn(row[cPpl]), act=_pn(row[cAct]);
-        if(!linePeople[line]){ var lp2=_pn(row[cPpl]); if(lp2>0) linePeople[line]=lp2; }
+        var pk=line+'|'+prod; if(!prodPpl[pk] && ppl>0) prodPpl[pk]=ppl;
         if(plan<=0 && act<=0) continue;
-        addGroup('DC|'+line+'|'+prod, prod, line, plan, act, std, ppl, String(row[cNote]==null?'':row[cNote]).trim());
+        addGroup('DC|'+line+'|'+prod+'|'+shift, prod, line, shift, plan, act, std, String(row[cNote]==null?'':row[cNote]).trim());
       }
     } else {
       var cLine2=col('线 别'); if(cLine2<0) cLine2=colHas('线'); if(cLine2<0) cLine2=0;
@@ -869,14 +869,17 @@ function parseProdWorkbook(wb){
         var ln=lastLine;
         var pr=String(rw[cP]==null?'':rw[cP]).trim(); if(!pr) continue;
         var std2=_pn(rw[cS]);
-        if(!linePeople[ln]){ var lp=_pn(rw[cWPp])||_pn(rw[cNPp]); if(lp>0) linePeople[ln]=lp; }
-        var wp=_pn(rw[cWP]), wa=_pn(rw[cWA]), np=_pn(rw[cNP]), na=_pn(rw[cNA]);
-        var plan2=wp+np, act2=wa+na;
-        if(plan2<=0 && act2<=0) continue;
-        addGroup('DH|'+ln+'|'+pr, pr, ln, plan2, act2, std2, 0, String(rw[cNt]==null?'':rw[cNt]).trim());
+        var wpp=_pn(rw[cWPp]), npp=_pn(rw[cNPp]);
+        if(!lineWP[ln] && wpp>0) lineWP[ln]=wpp;
+        if(!lineNP[ln] && npp>0) lineNP[ln]=npp;
+        var note2=String(rw[cNt]==null?'':rw[cNt]).trim();
+        var wp=_pn(rw[cWP]), wa=_pn(rw[cWA]);
+        if(wp>0) addGroup('DH|'+ln+'|'+pr+'|白', pr, ln, '白', wp, wa, std2, note2);
+        var np=_pn(rw[cNP]), na=_pn(rw[cNA]);
+        if(np>0) addGroup('DH|'+ln+'|'+pr+'|夜', pr, ln, '夜', np, na, std2, note2);
       }
     }
-    order.forEach(function(k){ var g=groups[k]; var ppl=g.people>0?g.people:(linePeople[g.line]||0); if(g.std<=0||ppl<=0) return; var loss=(g.plan-g.actual)/g.std*ppl; if(loss>0.05) out.push({product:g.product, plan:g.plan, actual:g.actual, std:g.std, people:ppl, note:g.note}); });
+    order.forEach(function(k){ var g=groups[k]; var ppl; if(kind==='dachong'){ ppl=prodPpl[g.line+'|'+g.product]||0; } else { ppl=(g.shift==='夜'?(lineNP[g.line]||0):(lineWP[g.line]||0)); } if(g.std<=0||ppl<=0) return; var loss=(g.plan-g.actual)/g.std*ppl; if(loss>0.05) out.push({product:g.product, plan:g.plan, actual:g.actual, std:g.std, people:ppl, note:(g.shift?g.shift+'班 ':'')+g.note}); });
   });
   return out;
 }
