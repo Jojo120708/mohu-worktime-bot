@@ -306,6 +306,10 @@ td { padding: 12px 14px; border-bottom: 1px solid #F3F4F6; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         新增采访
       </button>
+      <button class="btn-ghost" data-action="refreshBoard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        刷新
+      </button>
       <button class="btn-ghost" data-action="showCloudData">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
         云端数据
@@ -406,6 +410,7 @@ var cloudDashboardRecords = [];
 var cloudRecordsCache = [];
 var sysDataCache = [];
 var sysDataAll = [];
+var cloudLoadError = false;
 var adminLoggedIn = false;
 
 // ==================== EVENT DELEGATION ====================
@@ -418,6 +423,7 @@ document.addEventListener('DOMContentLoaded', function() {
     switch(action) {
       case 'startInterview': startInterview(); break;
       case 'showDashboard': showDashboard(); break;
+      case 'refreshBoard': showDashboard(); break;
       case 'showWelcome': showWelcome(); break;
       case 'goPrev': goPrev(); break;
       case 'goNext': goNext(); break;
@@ -497,8 +503,10 @@ function fetchBin(url, delayMs, onDone){
   setTimeout(function(){
     var attempt = function(tries){
       var xhr = new XMLHttpRequest();
-      xhr.open('GET', url + '/latest', true);
+      xhr.open('GET', url + '/latest?_=' + Date.now(), true);
       xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY);
+      xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      xhr.setRequestHeader('Pragma', 'no-cache');
       xhr.timeout = 10000;
       xhr.onload = function(){
         if (xhr.status>=200 && xhr.status<300){
@@ -1112,10 +1120,11 @@ function showDashboard(){
   loadCloudForView(function(recs, sys){ cloudDashboardRecords=recs; sysDataAll=sys; renderDashboard(); }, function(){ document.getElementById("dashboard-sub").textContent='网络错误，无法加载云端数据'; });
 }
 function loadCloudForView(onDone,onError){
+  cloudLoadError=false;
   var recs=null, sys=null;
   var finish=function(){ if(recs && sys) onDone(recs, sys); };
-  fetchBin(RECORDS_URL,0,function(ok,rec){ if(!ok){ if(onError) onError(); recs=[]; } else { recs=((rec&&rec.records)||[]); } finish(); });
-  fetchBin(SYSDATA_URL,150,function(ok,rec){ sys = ok?((rec&&rec.sysdata)||[]):[]; finish(); });
+  fetchBin(RECORDS_URL,0,function(ok,rec){ if(!ok){ cloudLoadError=true; recs=[]; } else { recs=((rec&&rec.records)||[]); } finish(); });
+  fetchBin(SYSDATA_URL,150,function(ok,rec){ if(!ok) cloudLoadError=true; sys = ok?((rec&&rec.sysdata)||[]):[]; finish(); });
 }
 function setTimeFilter(dim){ dashboardTimeFilter=dim; var now=new Date(); if(dim==='day'){ var d=new Date(); d.setDate(d.getDate()-1); dashboardDateFilter=d.toISOString().split('T')[0]; } else if(dim==='week'){ dashboardDateFilter=getISOWeek(now.toISOString().split('T')[0]); } else { dashboardDateFilter=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,'0'); } document.querySelectorAll('.time-filter-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-param')===dim); }); renderDatePicker(); renderDashboard(); }
 function renderDatePicker(){
@@ -1201,7 +1210,7 @@ function renderDashboard(){
   var unsubmitted = computeUnsubmitted();
   var needFixTeams = data.filter(function(r){ return (r.sysMohu>0&&r.mohuCoverage<95); }).map(function(r){ return r.label||r.teamName; });
 
-  var html='<div class="kpi-grid">';
+  var html=(cloudLoadError?'<div style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:600">⚠ 云端数据加载失败（网络或钉钉缓存问题），请点右上角「刷新」重试。</div>':'')+'<div class="kpi-grid">';
   html+=kpiCard('#EEF2FF','#4F46E5',iconTeam(),(dashboardTimeFilter==='day'?'班组数量':'时段数量'),data.length,'');
   html+=kpiCard('#F5F3FF','#7C3AED',iconClock(),'模糊覆盖率',avgM.toFixed(0)+'%','明细 '+fmtNum(totM)+'h / 系统 '+fmtNum(sysT.mohu)+'h');
   html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','临时不记产 '+fmtNum(totLS)+'h · 品质返工 '+fmtNum(totPZ)+'h · 标时不达成 '+fmtNum(totBS)+'h · 其他 '+fmtNum(totOT)+'h');
