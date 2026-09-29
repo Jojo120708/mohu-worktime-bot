@@ -1315,7 +1315,7 @@ function showCloudData(){
 }
 function renderCloudList(){
   var c=document.getElementById('cloud-data-content'); if(!c) return;
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:#374151;font-weight:600">共 '+cloudRecordsCache.length+' 条采集记录</span><div style="display:flex;gap:8px"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button data-action="showAdminLogin" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;border:1.5px solid #DC2626;background:#FEF2F2;font-size:12px;color:#DC2626;font-weight:600;cursor:pointer">管理</button></div></div>';
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:#374151;font-weight:600">共 '+cloudRecordsCache.length+' 条采集记录</span><div style="display:flex;gap:8px"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button class="btn-export" data-action="exportData">导出全部</button><button data-action="showAdminLogin" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;border:1.5px solid #DC2626;background:#FEF2F2;font-size:12px;color:#DC2626;font-weight:600;cursor:pointer">管理</button></div></div>';
   if(!cloudRecordsCache.length){ c.innerHTML=h+'<div style="text-align:center;padding:30px 0;color:#9CA3AF">暂无采集记录。可先点“导入系统数据”导入 MES 的模糊工时，再开始采访。</div>'; return; }
   h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#F3F4F6"><th style="padding:8px 10px;text-align:left">日期</th><th style="padding:8px 10px;text-align:left">班组</th><th style="padding:8px 10px;text-align:right">临时不记产</th><th style="padding:8px 10px;text-align:right">模糊覆盖</th></tr></thead><tbody>';
   cloudRecordsCache.forEach(function(r){ h+='<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 10px">'+esc(r.date)+'</td><td style="padding:8px 10px;font-weight:600">'+esc(r.teamName)+'</td><td style="padding:8px 10px;text-align:right">'+fmtNum(r.linshiTotal||0)+'h</td><td style="padding:8px 10px;text-align:right;color:'+covColor(r.mohuCoverage||0)+'">'+(r.mohuCoverage!=null?r.mohuCoverage.toFixed(0)+'%':'—')+'</td></tr>'; });
@@ -1555,7 +1555,7 @@ function exportTemplateXLSX(recs, filename){
   });
 }
 function exportData(){
-  var src = cloudDashboardRecords.length?cloudDashboardRecords:cloudRecordsCache;
+  var src = cloudRecordsCache.length?cloudRecordsCache:cloudDashboardRecords;
   if(!src||!src.length){ alert('暂无数据可导出'); return; }
   exportTemplateXLSX(src.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||TEAM_SORT.indexOf(a.teamName)-TEAM_SORT.indexOf(b.teamName); }), '模糊工时数据_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
