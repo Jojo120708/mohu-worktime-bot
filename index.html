@@ -425,6 +425,7 @@ var isSubmitted = false;
 var showDetailId = null;
 var dashboardTimeFilter = "day";
 var dashboardDateFilter = (function(){ var d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().split("T")[0]; })();
+var boardTeamFilter = "";
 var cloudDashboardRecords = [];
 var cloudRecordsCache = [];
 var sysDataCache = [];
@@ -1247,6 +1248,23 @@ function computeUnsubmitted(){
   });
   return order;
 }
+function inTeamViewPeriod(date){
+  if(!date) return false;
+  if(dashboardTimeFilter==='week') return getISOWeek(date)===dashboardDateFilter;
+  var mo = dashboardTimeFilter==='month' ? dashboardDateFilter : (dashboardDateFilter||'').slice(0,7);
+  return date.slice(0,7)===mo;
+}
+function teamUnsubmittedDays(team){
+  var sub={}; cloudDashboardRecords.forEach(function(r){ if(r.teamName===team) sub[r.date]=true; });
+  var days=[];
+  sysDataAll.forEach(function(s){
+    if(!s || s.teamName!==team || !s.date) return;
+    if((Number(s.mohu)||0)<=0) return;
+    if(!inTeamViewPeriod(s.date)) return;
+    if(!sub[s.date]) days.push(s.date);
+  });
+  days.sort(); return days;
+}
 function renderDashboard(){
   var data=aggregate(cloudDashboardRecords, dashboardTimeFilter);
   data.sort(function(a,b){ var ai=TEAM_SORT.indexOf(a.teamName),bi=TEAM_SORT.indexOf(b.teamName); if(ai<0)ai=99; if(bi<0)bi=99; if(ai!==bi) return ai-bi; return (a.date||"").localeCompare(b.date||""); });
@@ -1276,6 +1294,14 @@ function renderDashboard(){
   html+= unsubmitted.length ? chipsHtml(unsubmitted,'#FEF2F2','#DC2626','#FECACA') : '<div style="color:#059669;font-size:13px;font-weight:600">✓ 全部已提交</div>';
   html+='<div style="font-size:13px;color:#6B7280;margin:14px 0 8px">覆盖率待补（'+needFixTeams.length+'）：</div>';
   html+= needFixTeams.length ? chipsHtml(needFixTeams,'#FFFBEB','#D97706','#FDE68A') : '<div style="color:#059669;font-size:13px;font-weight:600">✓ 无（已提交均达标）</div>';
+  var teamPeriod = dashboardTimeFilter==='week' ? getWeekDateRange(dashboardDateFilter) : getMonthLabel((dashboardDateFilter||'').slice(0,7));
+  html+='<div style="font-size:13px;color:#6B7280;margin:16px 0 8px">按班组查看未提交日期（'+teamPeriod+'）：</div>';
+  html+='<select id="team-unsub-select" style="padding:8px 12px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:14px;color:#374151;background:#fff;outline:none;min-width:160px"><option value="">请选择班组…</option>';
+  TEAM_OPTIONS.forEach(function(t){ html+='<option value="'+t+'"'+(boardTeamFilter===t?' selected':'')+'>'+t+'</option>'; });
+  html+='</select>';
+  html+='<div style="margin-top:10px">';
+  if(boardTeamFilter){ var td=teamUnsubmittedDays(boardTeamFilter); html+= td.length ? chipsHtml(td,'#FEF2F2','#DC2626','#FECACA') : '<div style="color:#059669;font-size:13px;font-weight:600">✓ '+esc(boardTeamFilter)+' 本期全部已提交</div>'; }
+  html+='</div>';
   html+='</div>';
 
   html+='<div class="chart-grid">';
@@ -1310,6 +1336,7 @@ function renderDashboard(){
   html+='</tbody></table></div></div>';
 
   document.getElementById("dashboard-content").innerHTML=html;
+  var tus=document.getElementById('team-unsub-select'); if(tus) tus.addEventListener('change', function(){ boardTeamFilter=this.value; renderDashboard(); });
   setTimeout(function(){ drawCovChart('c-mohu', data, 'mohu'); drawCompChart('c-comp', totLS, totPZ, totBS, totOT); },50);
 }
 function hasDetail(r){ return (r.linshiList&&r.linshiList.length)||(r.pinzhiList&&r.pinzhiList.length)||(r.biaoshiList&&r.biaoshiList.length)||(r.otherList&&r.otherList.length); }
