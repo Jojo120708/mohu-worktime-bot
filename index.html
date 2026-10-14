@@ -976,12 +976,12 @@ function updateValidationMsg(){
 
 function renderSummaryStep(card){
   var list=answers.biaoshiList||[];
-  var html='<div class="question-header"><div class="question-icon warning">'+iconList()+'</div><span class="question-label">当日标时不达成原因总结</span></div>';
+  var html='<div class="question-header"><div class="question-icon warning">'+iconList()+'</div><span class="question-label">当日标时不达成原因总结及对策分析</span></div>';
   html+='<div style="font-size:12px;color:#9CA3AF;margin:-10px 0 14px">共 '+list.length+' 条不达成，合计 '+fmtNum(secTotal('biaoshiList'))+'h。请概括当天标时不达成的主要原因。</div>';
   html+='<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#374151;line-height:1.8">';
   html+= list.map(function(x){ return '· '+esc(x.product||'')+'：不达成 '+fmtNum(SECTION_DEFS.biaoshiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>');
   html+='</div>';
-  html+='<textarea id="biaoshi-summary" class="question-input" style="min-height:96px;resize:vertical;font-family:inherit" placeholder="例如：模具异常导致 XX/XX 产品未达计划，合计影响约 XXh，已安排…">'+esc(answers.biaoshiSummary||'')+'</textarea>';
+  html+='<textarea id="biaoshi-summary" class="question-input" style="min-height:96px;resize:vertical;font-family:inherit" placeholder="系统人数与实际人数不符/XX新产品标时问题/后续对策……">'+esc(answers.biaoshiSummary||'')+'</textarea>';
   html+='<div id="nav-container"></div>';
   card.innerHTML=html;
   var ta=document.getElementById('biaoshi-summary'); if(ta) ta.addEventListener('input', function(){ answers.biaoshiSummary=this.value; });
@@ -1367,7 +1367,7 @@ function detailBlock(r){
   if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">模糊工时-临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
   if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">模糊工时-品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'不达成'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（('+x.plan+'−'+x.actual+')÷'+x.std+'×'+x.people+'人）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
-  if (r.biaoshiSummary){ h+='<div class="detail-content-title" style="color:#8B5CF6">当日标时不达成原因总结</div><div style="font-size:12px;color:#374151;margin-bottom:10px;line-height:1.7">'+esc(r.biaoshiSummary)+'</div>'; }
+  if (r.biaoshiSummary){ h+='<div class="detail-content-title" style="color:#8B5CF6">当日标时不达成原因总结及对策分析</div><div style="font-size:12px;color:#374151;margin-bottom:10px;line-height:1.7">'+esc(r.biaoshiSummary)+'</div>'; }
   if (r.otherList&&r.otherList.length){ h+='<div class="detail-content-title" style="color:#EC4899">模糊工时-其他明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.otherList.map(function(x){ return x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.otherList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   return h;
 }
@@ -1646,7 +1646,7 @@ function buildExportRow(r){
 }
 function exportTemplateXLSX(recs, filename){
   loadSheetJS(function(failed){
-    var header1=['日期','提交时间','班组','模糊工时-系统数据','模糊工时-临时不记产','','','','模糊工时-品质返工','','','','','模糊工时-标时不达成','','','','','','模糊工时-其他','','','标时不达成原因总结'];
+    var header1=['日期','提交时间','班组','模糊工时-系统数据','模糊工时-临时不记产','','','','模糊工时-品质返工','','','','','模糊工时-标时不达成','','','','','','模糊工时-其他','','','标时不达成原因总结及对策'];
     var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
     var dataRows=recs.map(buildExportRow);
     if(failed||!window.XLSX){
