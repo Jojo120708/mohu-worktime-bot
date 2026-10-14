@@ -976,15 +976,16 @@ function updateValidationMsg(){
 
 function renderSummaryStep(card){
   var list=answers.biaoshiList||[];
-  var html='<div class="question-header"><div class="question-icon warning">'+iconList()+'</div><span class="question-label">当日标时不达成原因总结及对策分析</span></div>';
+  var html='<div class="question-header"><div class="question-icon warning">'+iconList()+'</div><span class="question-label">当日标时不达成原因总结及对策分析 <span style="color:#DC2626">*</span></span></div>';
   html+='<div style="font-size:12px;color:#9CA3AF;margin:-10px 0 14px">共 '+list.length+' 条不达成，合计 '+fmtNum(secTotal('biaoshiList'))+'h。请概括当天标时不达成的主要原因。</div>';
   html+='<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#374151;line-height:1.8">';
   html+= list.map(function(x){ return '· '+esc(x.product||'')+'：不达成 '+fmtNum(SECTION_DEFS.biaoshiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>');
   html+='</div>';
   html+='<textarea id="biaoshi-summary" class="question-input" style="min-height:96px;resize:vertical;font-family:inherit" placeholder="系统人数与实际人数不符/XX新产品标时问题/后续对策……">'+esc(answers.biaoshiSummary||'')+'</textarea>';
+  html+='<div id="biaoshi-summary-hint" style="font-size:12px;color:#DC2626;margin-top:6px;display:'+( (answers.biaoshiSummary||'').trim()?'none':'block' )+'">此项为必填，请填写后再进入下一步。</div>';
   html+='<div id="nav-container"></div>';
   card.innerHTML=html;
-  var ta=document.getElementById('biaoshi-summary'); if(ta) ta.addEventListener('input', function(){ answers.biaoshiSummary=this.value; });
+  var ta=document.getElementById('biaoshi-summary'); if(ta) ta.addEventListener('input', function(){ answers.biaoshiSummary=this.value; var h=document.getElementById('biaoshi-summary-hint'); if(h) h.style.display=this.value.trim()?'none':'block'; renderNavButtons(); });
   renderNavButtons();
 }
 function canProceed(){
@@ -997,6 +998,7 @@ function canProceed(){
     for (var i=0;i<sel.length;i++){ var sec=sel[i]; if((answers[sec]||[]).length===0) return false; if(!sectionCardsValid(sec)) return false; }
     return true;
   }
+  if (currentStep===5) return !!(answers.biaoshiSummary||'').trim();
   return true;
 }
 function renderNavButtons(){
@@ -1033,6 +1035,7 @@ function goBackToMissing(){
   var bad=false; selectedSections().forEach(function(sec){ if((answers[sec]||[]).length===0 || !sectionCardsValid(sec)) bad=true; });
   if (bad){ currentStep=4; renderInterview(); return; }
   if (!coverageOk().ok){ currentStep=3; renderInterview(); return; }
+  if (hasBiaoshi() && !(answers.biaoshiSummary||'').trim()){ currentStep=5; renderInterview(); return; }
   currentStep=6; renderInterview();
 }
 
@@ -1075,6 +1078,7 @@ function submitInterview(){
   if (isSubmitted) return;
   saveFieldValues();
   if (!coverageOk().ok) return;
+  if (hasBiaoshi() && !(answers.biaoshiSummary||'').trim()){ alert('请填写"当日标时不达成原因总结及对策分析"'); return; }
   var exist=records.find(function(r){ return r.teamName===answers.teamName && r.date===answers.date; });
   if (exist && !confirm("该班组今日已有记录，新数据将覆盖，是否继续？")) return;
   isSubmitted=true;
