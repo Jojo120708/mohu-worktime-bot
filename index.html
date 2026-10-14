@@ -454,6 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
       case 'toggleDetail': toggleDetail(btn.getAttribute('data-param')); break;
       case 'setTimeFilter': setTimeFilter(btn.getAttribute('data-param')); break;
       case 'exportData': exportData(); break;
+      case 'exportAll': exportAll(); break;
       case 'showSettings': showSettings(); break;
       case 'closeSettings': closeSettings(); break;
       case 'saveWebhookSettings': saveWebhookSettings(); break;
@@ -1368,7 +1369,7 @@ function showCloudData(){
 }
 function renderCloudList(){
   var c=document.getElementById('cloud-data-content'); if(!c) return;
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:#374151;font-weight:600">共 '+cloudRecordsCache.length+' 条采集记录</span><div style="display:flex;gap:8px"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button class="btn-export" data-action="exportData">导出全部</button><button data-action="showAdminLogin" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;border:1.5px solid #DC2626;background:#FEF2F2;font-size:12px;color:#DC2626;font-weight:600;cursor:pointer">管理</button></div></div>';
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:#374151;font-weight:600">共 '+cloudRecordsCache.length+' 条采集记录</span><div style="display:flex;gap:8px"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button class="btn-export" data-action="exportAll">导出全部</button><button data-action="showAdminLogin" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;border:1.5px solid #DC2626;background:#FEF2F2;font-size:12px;color:#DC2626;font-weight:600;cursor:pointer">管理</button></div></div>';
   if(!cloudRecordsCache.length){ c.innerHTML=h+'<div style="text-align:center;padding:30px 0;color:#9CA3AF">暂无采集记录。可先点“导入系统数据”导入 MES 的模糊工时，再开始采访。</div>'; return; }
   h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#F3F4F6"><th style="padding:8px 10px;text-align:left">日期</th><th style="padding:8px 10px;text-align:left">班组</th><th style="padding:8px 10px;text-align:right">临时不记产</th><th style="padding:8px 10px;text-align:right">模糊覆盖</th></tr></thead><tbody>';
   cloudRecordsCache.forEach(function(r){ h+='<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 10px">'+esc(r.date)+'</td><td style="padding:8px 10px;font-weight:600">'+esc(r.teamName)+'</td><td style="padding:8px 10px;text-align:right">'+fmtNum(r.linshiTotal||0)+'h</td><td style="padding:8px 10px;text-align:right;color:'+covColor(r.mohuCoverage||0)+'">'+(r.mohuCoverage!=null?r.mohuCoverage.toFixed(0)+'%':'—')+'</td></tr>'; });
@@ -1386,7 +1387,7 @@ function adminLogin(){ var i=document.getElementById('admin-pwd-input'); var e=d
 function showAdminPanel(){
   var c=document.getElementById('cloud-data-content'); if(!c) return;
   var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span style="font-size:14px;font-weight:600;color:#059669">管理员模式</span></div>';
-  h+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button class="btn-export" data-action="exportData">导出全部 xlsx</button></div>';
+  h+='<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button class="btn-export" data-action="exportAll">导出全部 xlsx</button></div>';
   h+='<div style="padding:16px;border:1.5px solid #FCA5A5;border-radius:12px;background:#FEF2F2;margin-bottom:16px"><div style="font-size:14px;font-weight:600;color:#991B1B;margin-bottom:4px">清空全部采集记录</div><div style="font-size:12px;color:#6B7280;margin-bottom:12px">删除云端所有 '+cloudRecordsCache.length+' 条记录，不可恢复</div><button data-action="clearAllCloudData" style="padding:8px 20px;border-radius:8px;border:none;background:#DC2626;color:#fff;font-size:12px;font-weight:600;cursor:pointer">清空全部</button></div>';
   h+='<div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:8px">删除单条记录</div>';
   if(!cloudRecordsCache.length){ h+='<div style="color:#9CA3AF;font-size:12px">暂无数据</div>'; }
@@ -1608,9 +1609,16 @@ function exportTemplateXLSX(recs, filename){
   });
 }
 function exportData(){
-  var src = cloudRecordsCache.length?cloudRecordsCache:cloudDashboardRecords;
+  var src = cloudDashboardRecords;
   if(!src||!src.length){ alert('暂无数据可导出'); return; }
   exportTemplateXLSX(src.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||TEAM_SORT.indexOf(a.teamName)-TEAM_SORT.indexOf(b.teamName); }), '模糊工时数据_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+function exportAll(){
+  var toast=showCloudToast('正在汇总全部数据（含历史归档）...','syncing',true);
+  var urls=[RECORDS_URL];
+  Object.keys(ARCHIVE_BINS).forEach(function(mo){ getArchiveUrls(mo).forEach(function(u){ if(urls.indexOf(u)<0) urls.push(u); }); });
+  var merged=[], pending=urls.length;
+  urls.forEach(function(u,i){ fetchBin(u, i*120, function(ok,rec){ if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); pending--; if(pending===0){ if(toast) toast.remove(); if(!merged.length){ alert('暂无数据可导出'); return; } exportTemplateXLSX(merged.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||TEAM_SORT.indexOf(a.teamName)-TEAM_SORT.indexOf(b.teamName); }), '模糊工时全量数据_'+new Date().toISOString().slice(0,10)+'.xlsx'); } }); });
 }
 
 // ==================== ICONS ====================
