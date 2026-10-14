@@ -331,8 +331,25 @@ var RECORDS_BIN_ID = "6aa35e7bac6210605abed9b3";   // 模糊工时采集记录
 var SYSDATA_BIN_ID = "6aa35e7dac6210605abed9b4";   // 系统数据（不记产/模糊），后台导入
 var RECORDS_URL = "https://api.jsonbin.io/v3/b/" + RECORDS_BIN_ID;
 var SYSDATA_URL = "https://api.jsonbin.io/v3/b/" + SYSDATA_BIN_ID;
-var ARCHIVE_BIN_ID = "6acee5c8ac6210605a2f7a8a";   // 旧记录归档（主bin裁剪时移入）
-var ARCHIVE_URL = "https://api.jsonbin.io/v3/b/" + ARCHIVE_BIN_ID;
+// 按月归档：主bin裁剪掉的旧记录按所属月份写入对应归档bin（每月2个，防单bin超100KB）
+var ARCHIVE_BINS = {
+  "2026-09": ["6acee5c8ac6210605a2f7a8a","6aceeab4ac6210605a2f832c"],
+  "2026-10": ["6aceeab5ffd5d160536927bd","6aceeab6ffd5d160536927c6"],
+  "2026-11": ["6aceeab9ffd5d160536927c7","6aceeabaac6210605a2f8334"],
+  "2026-12": ["6aceeabbffd5d160536927d2","6aceeabcffd5d160536927d3"],
+  "2027-01": ["6aceeabeac6210605a2f833b","6aceeabfffd5d160536927d4"],
+  "2027-02": ["6aceeac1ac6210605a2f8345","6aceeac2ffd5d160536927df"],
+  "2027-03": ["6aceeac4ac6210605a2f8346","6aceeac5ac6210605a2f834f"],
+  "2027-04": ["6aceeac6ffd5d160536927e8","6aceeac7ac6210605a2f8350"],
+  "2027-05": ["6aceeac8ac6210605a2f8351","6aceeac9ac6210605a2f8352"],
+  "2027-06": ["6aceeacbffd5d160536927f2","6aceeaccac6210605a2f835f"],
+  "2027-07": ["6aceeacdac6210605a2f8360","6aceeaceac6210605a2f8361"],
+  "2027-08": ["6aceead0ffd5d160536927f8","6aceead1ffd5d160536927f9"],
+  "2027-09": ["6aceead2ac6210605a2f836b","6aceead3ffd5d160536927fa"],
+  "2027-10": ["6aceead4ac6210605a2f8374","6aceead6ffd5d16053692802"],
+  "2027-11": ["6aceead7ac6210605a2f8375","6aceead8ffd5d16053692803"],
+  "2027-12": ["6aceead9ac6210605a2f837f","6aceeadaac6210605a2f8380"]
+};
 var ADMIN_PASSWORD = "minth2026";
 var STORAGE_KEY = "mohu_worktime_records";
 var PENDING_KEY = "mohuPendingCloudUploads";
@@ -589,7 +606,7 @@ function doUpload(record, attempt, isRetry){
           if(idx>=0) list[idx]=record; else list.push(record);
           var xhr2=new XMLHttpRequest(); xhr2.open('PUT', RECORDS_URL, true);
           xhr2.setRequestHeader('Content-Type','application/json'); xhr2.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr2.timeout=10000;
-          xhr2.onload=function(){ if(xhr2.status>=200&&xhr2.status<300){ if(pruned.length) archiveRecords(pruned); verifyUpload(record,attempt,isRetry); } else doUpload(record,attempt+1,isRetry); };
+          xhr2.onload=function(){ if(xhr2.status>=200&&xhr2.status<300){ if(pruned.length) archivePrunedRecords(pruned); verifyUpload(record,attempt,isRetry); } else doUpload(record,attempt+1,isRetry); };
           xhr2.onerror=function(){ doUpload(record,attempt+1,isRetry); };
           xhr2.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
           xhr2.send(JSON.stringify({records:list}));
@@ -601,19 +618,23 @@ function doUpload(record, attempt, isRetry){
     xhr.send();
   }, delay);
 }
-function archiveRecords(pruned){
-  try{
-    fetchBin(ARCHIVE_URL,0,function(ok,rec){
-      var cur = ok?((((rec&&rec.records)||[]).slice())):[];
-      pruned.forEach(function(p){
-        var idx=-1; for(var i=0;i<cur.length;i++){ if(cur[i].teamName===p.teamName && cur[i].date===p.date){ idx=i; break; } }
-        if(idx>=0){ if(String(p.submitTime||'')>String(cur[idx].submitTime||'')) cur[idx]=p; } else cur.push(p);
-      });
-      var xhr=new XMLHttpRequest(); xhr.open('PUT', ARCHIVE_URL, true);
-      xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr.timeout=15000;
-      xhr.send(JSON.stringify({records:cur}));
-    });
-  }catch(e){}
+function getArchiveUrls(monthKey){ return (ARCHIVE_BINS[monthKey]||[]).map(function(id){ return "https://api.jsonbin.io/v3/b/" + id; }); }
+function archivePrunedRecords(pruned){
+  if(!pruned || !pruned.length) return;
+  var byMonth={};
+  pruned.forEach(function(r){ var mo=(r.date||"").slice(0,7); if(!/^\d{4}-\d{2}$/.test(mo) || !ARCHIVE_BINS[mo]) return; (byMonth[mo]=byMonth[mo]||[]).push(r); });
+  Object.keys(byMonth).forEach(function(mo){
+    var urls=getArchiveUrls(mo); var existing=[]; var pending=urls.length;
+    var finish=function(){
+      existing=mergeRecords(existing, byMonth[mo]);
+      existing.sort(function(a,b){ return (a.date||"").localeCompare(b.date||"") || (a.teamName||"").localeCompare(b.teamName||""); });
+      var chunks=[[]]; var size=15;
+      existing.forEach(function(r){ var rl=JSON.stringify(r).length+1; if(size+rl>90000 && chunks[chunks.length-1].length>0){ chunks.push([]); size=15; } chunks[chunks.length-1].push(r); size+=rl; });
+      chunks.forEach(function(chunk,ci){ if(ci>=urls.length){ console.warn("[Archive] "+mo+" capacity exceeded, dropped "+(chunks.length-urls.length)+" chunk(s)"); return; } var x=new XMLHttpRequest(); x.open('PUT', urls[ci], true); x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); x.timeout=15000; x.send(JSON.stringify({records:chunk})); });
+      for(var ci2=chunks.length; ci2<urls.length; ci2++){ (function(url){ var x=new XMLHttpRequest(); x.open('PUT', url, true); x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); x.timeout=15000; x.send(JSON.stringify({records:[]})); })(urls[ci2]); }
+    };
+    urls.forEach(function(url,i){ fetchBin(url, i*200, function(ok,rec){ if(ok) existing=mergeRecords(existing, ((rec&&rec.records)||[])); pending--; if(pending===0) finish(); }); });
+  });
 }
 function verifyUpload(record, attempt, isRetry){
   setTimeout(function(){
@@ -1137,13 +1158,26 @@ function showDashboard(){
   document.getElementById("dashboard-sub").textContent='正在加载云端数据...';
   loadCloudForView(function(recs, sys){ cloudDashboardRecords=recs; sysDataAll=sys; renderDashboard(); }, function(){ document.getElementById("dashboard-sub").textContent='网络错误，无法加载云端数据'; });
 }
+function getViewMonths(){
+  var base=null;
+  if(dashboardTimeFilter==='month' && /^\d{4}-\d{2}$/.test(dashboardDateFilter)) base=dashboardDateFilter;
+  else if(/^\d{4}-\d{2}-\d{2}$/.test(dashboardDateFilter)) base=dashboardDateFilter.slice(0,7);
+  else if(/^\d{4}-W\d{2}$/.test(dashboardDateFilter)){ var pp=dashboardDateFilter.split('-W'); var jan4=new Date(parseInt(pp[0]),0,4); var mon=new Date(jan4); mon.setDate(jan4.getDate()-(jan4.getDay()+6)%7+(parseInt(pp[1])-1)*7); base=mon.toISOString().slice(0,7); }
+  if(!base) base=new Date().toISOString().slice(0,7);
+  var months=[base];
+  var y=parseInt(base.slice(0,4)),m=parseInt(base.slice(5,7)); m--; if(m===0){m=12;y--;} months.push(y+"-"+String(m).padStart(2,"0"));
+  var y2=parseInt(base.slice(0,4)),m2=parseInt(base.slice(5,7)); m2++; if(m2===13){m2=1;y2++;} months.push(y2+"-"+String(m2).padStart(2,"0"));
+  return months;
+}
 function loadCloudForView(onDone,onError){
   cloudLoadError=false;
-  var recs=null, sys=null, arch=null;
-  var finish=function(){ if(recs && sys && arch!==null) onDone(mergeRecords(recs, arch), sys); };
-  fetchBin(RECORDS_URL,0,function(ok,rec){ if(!ok){ cloudLoadError=true; recs=[]; } else { recs=((rec&&rec.records)||[]); } finish(); });
-  fetchBin(SYSDATA_URL,150,function(ok,rec){ if(!ok) cloudLoadError=true; sys = ok?((rec&&rec.sysdata)||[]):[]; finish(); });
-  fetchBin(ARCHIVE_URL,300,function(ok,rec){ arch = ok?(((rec&&rec.records)||[])):[]; finish(); });
+  var urls=[]; getViewMonths().forEach(function(mo){ getArchiveUrls(mo).forEach(function(u){ if(urls.indexOf(u)<0) urls.push(u); }); });
+  var recs=null, sys=null, archMerged=[];
+  var pending=2+urls.length;
+  var done=function(){ pending--; if(pending===0){ if(recs && sys) onDone(mergeRecords(recs, archMerged), sys); else if(onError) onError(); } };
+  fetchBin(RECORDS_URL,0,function(ok,rec){ if(!ok){ cloudLoadError=true; recs=[]; } else { recs=((rec&&rec.records)||[]); } done(); });
+  fetchBin(SYSDATA_URL,150,function(ok,rec){ if(!ok) cloudLoadError=true; sys=ok?((rec&&rec.sysdata)||[]):[]; done(); });
+  urls.forEach(function(u,i){ fetchBin(u, 300+i*200, function(ok,rec){ if(ok) archMerged=mergeRecords(archMerged, ((rec&&rec.records)||[])); done(); }); });
 }
 function setTimeFilter(dim){ dashboardTimeFilter=dim; var now=new Date(); if(dim==='day'){ var d=new Date(); d.setDate(d.getDate()-1); dashboardDateFilter=d.toISOString().split('T')[0]; } else if(dim==='week'){ dashboardDateFilter=getISOWeek(now.toISOString().split('T')[0]); } else { dashboardDateFilter=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,'0'); } document.querySelectorAll('.time-filter-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-param')===dim); }); renderDatePicker(); renderDashboard(); }
 function renderDatePicker(){
