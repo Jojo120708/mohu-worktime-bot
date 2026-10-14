@@ -331,6 +331,8 @@ var RECORDS_BIN_ID = "6aa35e7bac6210605abed9b3";   // 模糊工时采集记录
 var SYSDATA_BIN_ID = "6aa35e7dac6210605abed9b4";   // 系统数据（不记产/模糊），后台导入
 var RECORDS_URL = "https://api.jsonbin.io/v3/b/" + RECORDS_BIN_ID;
 var SYSDATA_URL = "https://api.jsonbin.io/v3/b/" + SYSDATA_BIN_ID;
+var ARCHIVE_BIN_ID = "6acee5c8ac6210605a2f7a8a";   // 旧记录归档（主bin裁剪时移入）
+var ARCHIVE_URL = "https://api.jsonbin.io/v3/b/" + ARCHIVE_BIN_ID;
 var ADMIN_PASSWORD = "minth2026";
 var STORAGE_KEY = "mohu_worktime_records";
 var PENDING_KEY = "mohuPendingCloudUploads";
@@ -577,15 +579,17 @@ function doUpload(record, attempt, isRetry){
       if (xhr.status>=200 && xhr.status<300){
         try{
           var resp=JSON.parse(xhr.responseText); var data=resp.record||{}; var list=data.records||[];
-          // 滚动窗口：保留 90 天 + 体积护栏 <85KB
-          var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-90); var cut=cutoff.toISOString().slice(0,10);
-          list=list.filter(function(r){ return !r.date || r.date>=cut; });
-          var guard=true; while(guard){ guard=false; if(JSON.stringify({records:list}).length>85000 && list.length>1){ list.shift(); guard=true; } }
+          var pruned=[];
+          // 滚动窗口：保留 30 天 + 体积护栏 <60KB（留大记录余量，避免逼近100KB写入失败）
+          var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30); var cut=cutoff.toISOString().slice(0,10);
+          var kept=[]; list.forEach(function(r){ if(!r.date || r.date>=cut) kept.push(r); else pruned.push(r); });
+          list=kept;
+          var guard=true; while(guard){ guard=false; if(JSON.stringify({records:list}).length>60000 && list.length>1){ pruned.push(list.shift()); guard=true; } }
           var idx=-1; for(var i=0;i<list.length;i++){ if(list[i].teamName===record.teamName && list[i].date===record.date){ idx=i; break; } }
           if(idx>=0) list[idx]=record; else list.push(record);
           var xhr2=new XMLHttpRequest(); xhr2.open('PUT', RECORDS_URL, true);
           xhr2.setRequestHeader('Content-Type','application/json'); xhr2.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr2.timeout=10000;
-          xhr2.onload=function(){ if(xhr2.status>=200&&xhr2.status<300) verifyUpload(record,attempt,isRetry); else doUpload(record,attempt+1,isRetry); };
+          xhr2.onload=function(){ if(xhr2.status>=200&&xhr2.status<300){ if(pruned.length) archiveRecords(pruned); verifyUpload(record,attempt,isRetry); } else doUpload(record,attempt+1,isRetry); };
           xhr2.onerror=function(){ doUpload(record,attempt+1,isRetry); };
           xhr2.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
           xhr2.send(JSON.stringify({records:list}));
@@ -596,6 +600,20 @@ function doUpload(record, attempt, isRetry){
     xhr.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
     xhr.send();
   }, delay);
+}
+function archiveRecords(pruned){
+  try{
+    fetchBin(ARCHIVE_URL,0,function(ok,rec){
+      var cur = ok?((((rec&&rec.records)||[]).slice())):[];
+      pruned.forEach(function(p){
+        var idx=-1; for(var i=0;i<cur.length;i++){ if(cur[i].teamName===p.teamName && cur[i].date===p.date){ idx=i; break; } }
+        if(idx>=0){ if(String(p.submitTime||'')>String(cur[idx].submitTime||'')) cur[idx]=p; } else cur.push(p);
+      });
+      var xhr=new XMLHttpRequest(); xhr.open('PUT', ARCHIVE_URL, true);
+      xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr.timeout=15000;
+      xhr.send(JSON.stringify({records:cur}));
+    });
+  }catch(e){}
 }
 function verifyUpload(record, attempt, isRetry){
   setTimeout(function(){
@@ -1121,10 +1139,11 @@ function showDashboard(){
 }
 function loadCloudForView(onDone,onError){
   cloudLoadError=false;
-  var recs=null, sys=null;
-  var finish=function(){ if(recs && sys) onDone(recs, sys); };
+  var recs=null, sys=null, arch=null;
+  var finish=function(){ if(recs && sys && arch!==null) onDone(mergeRecords(recs, arch), sys); };
   fetchBin(RECORDS_URL,0,function(ok,rec){ if(!ok){ cloudLoadError=true; recs=[]; } else { recs=((rec&&rec.records)||[]); } finish(); });
   fetchBin(SYSDATA_URL,150,function(ok,rec){ if(!ok) cloudLoadError=true; sys = ok?((rec&&rec.sysdata)||[]):[]; finish(); });
+  fetchBin(ARCHIVE_URL,300,function(ok,rec){ arch = ok?(((rec&&rec.records)||[])):[]; finish(); });
 }
 function setTimeFilter(dim){ dashboardTimeFilter=dim; var now=new Date(); if(dim==='day'){ var d=new Date(); d.setDate(d.getDate()-1); dashboardDateFilter=d.toISOString().split('T')[0]; } else if(dim==='week'){ dashboardDateFilter=getISOWeek(now.toISOString().split('T')[0]); } else { dashboardDateFilter=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,'0'); } document.querySelectorAll('.time-filter-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-param')===dim); }); renderDatePicker(); renderDashboard(); }
 function renderDatePicker(){
