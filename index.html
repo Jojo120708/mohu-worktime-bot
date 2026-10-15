@@ -398,10 +398,10 @@ var SECTION_DEFS = {
   },
   peiXunList: {
     title: "新员工入职培训明细", color: "#3B82F6",
-    desc: "新员工入职培训工时 = 新员工人数 × 每人出勤工时",
+    desc: "新员工入职培训工时 = 新员工人数 × 每人培训小时",
     fields: [
       { k: "people", l: "新员工人数", t: "num" },
-      { k: "hoursPerPerson", l: "每人出勤工时(小时)", t: "num" }
+      { k: "hoursPerPerson", l: "每人培训小时", t: "num" }
     ],
     calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
   },
@@ -1681,7 +1681,7 @@ function buildExportRow(r){
   row[14]=fz.map(function(x){return x.name||'';}).join('；');
   row[15]=fz.map(function(x){return x.position||'';}).join('；');
   row[16]=r.fuZhuTotal!=null?Number(r.fuZhuTotal.toFixed(1)):fz.reduce(function(s,x){return s+(Number(x.hours)||0);},0);
-  // 新员工入职培训 R-T: 合计工时,新员工人数,每人出勤工时
+  // 新员工入职培训 R-T: 合计工时,新员工人数,每人培训小时
   var px=r.peiXunList||[];
   row[17]=r.peiXunTotal!=null?Number(r.peiXunTotal.toFixed(1)):px.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.peiXunList.calc(x));},0);
   row[18]=px.map(function(x){return x.people;}).join('；');
@@ -1714,7 +1714,7 @@ function buildExportRow(r){
 function exportTemplateXLSX(recs, filename){
   loadSheetJS(function(failed){
     var header1=['日期','提交时间','班组','模糊工时-系统数据','品质返工（产品返工、维修）','','','','','检验工序增加','','','','','日常辅助事务','','','新员工入职培训','','','新品调试/试做','','','','','标时不达成','','','','','','','其他','','','','标时不达成原因总结及对策'];
-    var header2=['日期','提交时间','班组','每天导入','合计工时','产品型号','人数','每人工时','原因备注','合计工时','产品型号','人数','每人工时','原因备注','姓名','岗位','合计工时','合计工时','新员工人数','每人出勤工时','合计工时','新品名称','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
+    var header2=['日期','提交时间','班组','每天导入','合计工时','产品型号','人数','每人工时','原因备注','合计工时','产品型号','人数','每人工时','原因备注','姓名','岗位','合计工时','合计工时','新员工人数','每人培训小时','合计工时','新品名称','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
     var dataRows=recs.map(buildExportRow);
     if(failed||!window.XLSX){
       var csv=''+header2.join(',')+'\n'+dataRows.map(function(row){ return row.map(function(c){ var s=String(c==null?'':c); if(/[",\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }).join(','); }).join('\n');
