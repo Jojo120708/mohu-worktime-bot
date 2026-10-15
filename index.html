@@ -359,13 +359,13 @@ var TEAM_OPTIONS = ["一部一课","一部二课","一部三课","二部一课",
 var TEAM_SORT = ["一部一课","一部二课","一部三课","二部一课","二部二课","二部三课","二部四课","二部五课","三部一课"];
 // 看板"未提交"提醒对照的应提交班组名单（可按需增删）
 var EXPECTED_TEAMS = ["一部一课","一部二课","一部三课","二部一课","二部二课","二部三课","二部四课","二部五课"];
-// 是否显示"模糊工时-其他"选项（暂时隐藏；需要时改为 true 即可释放）
+// 是否显示"其他"选项（暂时隐藏；需要时改为 true 即可释放）
 var SHOW_OTHER = false;
 
 // 明细区块定义
 var SECTION_DEFS = {
   linshiList: {
-    title: "模糊工时-临时不记产明细", color: "#F59E0B",
+    title: "临时不记产明细", color: "#F59E0B",
     desc: "临时不记产（不含系统已统计）：逐条填写 姓名 / 岗位 / 工作内容 / 工时",
     fields: [
       { k: "name", l: "姓名", t: "text" },
@@ -376,7 +376,7 @@ var SECTION_DEFS = {
     calc: function(d){ return Number(d.hours) || 0; }
   },
   pinzhiList: {
-    title: "模糊工时-品质返工明细", color: "#06B6D4",
+    title: "品质返工明细", color: "#06B6D4",
     desc: "品质返工工时 = 人数 × 每人工时",
     fields: [
       { k: "model", l: "产品型号", t: "text" },
@@ -387,7 +387,7 @@ var SECTION_DEFS = {
     calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
   },
   jianyanList: {
-    title: "模糊工时-增加检验人员明细", color: "#14B8A6",
+    title: "增加检验人员明细", color: "#14B8A6",
     desc: "增加检验人员工时 = 人数 × 每人工时",
     fields: [
       { k: "model", l: "产品型号", t: "text" },
@@ -398,7 +398,7 @@ var SECTION_DEFS = {
     calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
   },
   biaoshiList: {
-    title: "模糊工时-标时不达成明细", color: "#8B5CF6",
+    title: "标时不达成明细", color: "#8B5CF6",
     desc: "不达成工时 = (计划量 − 生产数量) ÷ 标时 × 人数",
     fields: [
       { k: "product", l: "产品名称", t: "text" },
@@ -416,7 +416,7 @@ var SECTION_DEFS = {
     }
   },
   otherList: {
-    title: "模糊工时-其他明细", color: "#EC4899",
+    title: "其他明细", color: "#EC4899",
     desc: "合计工时 = 人数 × 每人工时",
     fields: [
       { k: "people", l: "人数", t: "num" },
@@ -678,7 +678,7 @@ function uploadRecordToCloud(record){
 // ==================== INTERVIEW FLOW ====================
 // steps: 0班组 1日期 2系统数据 3选择原因类型(多选) 4填写明细(统一) 5完成
 var TOTAL_STEPS = 6;
-var SEL_LABELS = { linshiList:"模糊工时-临时不记产", pinzhiList:"模糊工时-品质返工", jianyanList:"模糊工时-增加检验人员", biaoshiList:"模糊工时-标时不达成", otherList:"模糊工时-其他" };
+var SEL_LABELS = { linshiList:"临时不记产", pinzhiList:"品质返工", jianyanList:"增加检验人员", biaoshiList:"标时不达成", otherList:"其他" };
 function stepTitle(s){ return ["选择班组","选择日期","系统数据","选择原因类型","填写明细","标时不达成总结","提交"][s]; }
 function selectedSections(){ return SECTION_ORDER.filter(function(sec){ return answers.sel && answers.sel[sec]; }); }
 function hasBiaoshi(){ return !!(answers.sel && answers.sel.biaoshiList && (answers.biaoshiList||[]).length>0); }
@@ -1382,12 +1382,12 @@ function renderDashboard(){
 function hasDetail(r){ return (r.linshiList&&r.linshiList.length)||(r.pinzhiList&&r.pinzhiList.length)||(r.jianyanList&&r.jianyanList.length)||(r.biaoshiList&&r.biaoshiList.length)||(r.otherList&&r.otherList.length); }
 function detailBlock(r){
   var h='';
-  if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">模糊工时-临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
-  if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">模糊工时-品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
-  if (r.jianyanList&&r.jianyanList.length){ h+='<div class="detail-content-title" style="color:#14B8A6">模糊工时-增加检验人员明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.jianyanList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.jianyanList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
-  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'不达成'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（('+x.plan+'−'+x.actual+')÷'+x.std+'×'+x.people+'人）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
+  if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
+  if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
+  if (r.jianyanList&&r.jianyanList.length){ h+='<div class="detail-content-title" style="color:#14B8A6">增加检验人员明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.jianyanList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.jianyanList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
+  if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'不达成'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（('+x.plan+'−'+x.actual+')÷'+x.std+'×'+x.people+'人）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
   if (r.biaoshiSummary){ h+='<div class="detail-content-title" style="color:#8B5CF6">当日标时不达成原因总结及对策分析</div><div style="font-size:12px;color:#374151;margin-bottom:10px;line-height:1.7">'+esc(r.biaoshiSummary)+'</div>'; }
-  if (r.otherList&&r.otherList.length){ h+='<div class="detail-content-title" style="color:#EC4899">模糊工时-其他明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.otherList.map(function(x){ return x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.otherList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
+  if (r.otherList&&r.otherList.length){ h+='<div class="detail-content-title" style="color:#EC4899">其他明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.otherList.map(function(x){ return x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.otherList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   return h;
 }
 function toggleDetail(key){ showDetailId = showDetailId===key?null:key; renderDashboard(); }
@@ -1632,27 +1632,27 @@ function buildExportRow(r){
   var row=new Array(30).fill('');
   row[0]=r.date||''; row[1]=r.submitTime||''; row[2]=r.teamName||'';
   row[3]=r.sysMohu!=null?r.sysMohu:'';
-  // 模糊工时-临时不记产 E-H: 姓名,岗位,工作内容,工时
+  // 临时不记产 E-H: 姓名,岗位,工作内容,工时
   var ls=r.linshiList||[];
   row[4]=ls.map(function(x){return x.name||'';}).join('；');
   row[5]=ls.map(function(x){return x.position||'';}).join('；');
   row[6]=ls.map(function(x){return x.content||'';}).join('；');
   row[7]=r.linshiTotal!=null?Number(r.linshiTotal.toFixed(1)):(ls.reduce(function(s,x){return s+(Number(x.hours)||0);},0));
-  // 模糊工时-品质返工 I-M: 工时,产品型号,人数,每人工时,原因备注
+  // 品质返工 I-M: 工时,产品型号,人数,每人工时,原因备注
   var pz=r.pinzhiList||[];
   row[8]=r.pinzhiTotal!=null?Number(r.pinzhiTotal.toFixed(1)):pz.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.pinzhiList.calc(x));},0);
   row[9]=pz.map(function(x){return x.model||'';}).join('；');
   row[10]=pz.map(function(x){return x.people;}).join('；');
   row[11]=pz.map(function(x){return x.hoursPerPerson;}).join('；');
   row[12]=pz.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 模糊工时-增加检验人员 N-R: 工时,产品型号,人数,每人工时,原因备注
+  // 增加检验人员 N-R: 工时,产品型号,人数,每人工时,原因备注
   var jy=r.jianyanList||[];
   row[13]=r.jianyanTotal!=null?Number(r.jianyanTotal.toFixed(1)):jy.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.jianyanList.calc(x));},0);
   row[14]=jy.map(function(x){return x.model||'';}).join('；');
   row[15]=jy.map(function(x){return x.people;}).join('；');
   row[16]=jy.map(function(x){return x.hoursPerPerson;}).join('；');
   row[17]=jy.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 模糊工时-标时不达成 S-Y: 影响合计,产品名称,计划量,生产数量,标时,人数,原因备注
+  // 标时不达成 S-Y: 影响合计,产品名称,计划量,生产数量,标时,人数,原因备注
   var bs=r.biaoshiList||[];
   row[18]=r.biaoshiTotal!=null?Number(r.biaoshiTotal.toFixed(1)):bs.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.biaoshiList.calc(x));},0);
   row[19]=bs.map(function(x){return x.product||'';}).join('；');
@@ -1661,7 +1661,7 @@ function buildExportRow(r){
   row[22]=bs.map(function(x){return x.std;}).join('；');
   row[23]=bs.map(function(x){return x.people;}).join('；');
   row[24]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 模糊工时-其他 Z-AC: 合计工时,人数,每人工时,原因
+  // 其他 Z-AC: 合计工时,人数,每人工时,原因
   var ot=r.otherList||[];
   row[25]=r.otherTotal!=null?Number(r.otherTotal.toFixed(1)):ot.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.otherList.calc(x));},0);
   row[26]=ot.map(function(x){return x.people;}).join('；');
@@ -1672,7 +1672,7 @@ function buildExportRow(r){
 }
 function exportTemplateXLSX(recs, filename){
   loadSheetJS(function(failed){
-    var header1=['日期','提交时间','班组','模糊工时-系统数据','模糊工时-临时不记产','','','','模糊工时-品质返工','','','','','模糊工时-增加检验人员','','','','','模糊工时-标时不达成','','','','','','模糊工时-其他','','','标时不达成原因总结及对策'];
+    var header1=['日期','提交时间','班组','模糊工时-系统数据','临时不记产','','','','品质返工','','','','','增加检验人员','','','','','标时不达成','','','','','','其他','','','标时不达成原因总结及对策'];
     var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','增加检验人员工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
     var dataRows=recs.map(buildExportRow);
     if(failed||!window.XLSX){
