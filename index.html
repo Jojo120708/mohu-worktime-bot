@@ -376,8 +376,8 @@ var SECTION_DEFS = {
     calc: function(d){ return Number(d.hours) || 0; }
   },
   pinzhiList: {
-    title: "品质返工明细", color: "#06B6D4",
-    desc: "品质返工工时 = 人数 × 每人工时",
+    title: "品质返工（产品返工、维修）明细", color: "#06B6D4",
+    desc: "品质返工（产品返工、维修）工时 = 人数 × 每人工时",
     fields: [
       { k: "model", l: "产品型号", t: "text" },
       { k: "people", l: "人数", t: "num" },
@@ -387,8 +387,8 @@ var SECTION_DEFS = {
     calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
   },
   jianyanList: {
-    title: "增加检验人员明细", color: "#14B8A6",
-    desc: "增加检验人员工时 = 人数 × 每人工时",
+    title: "检验工序增加明细", color: "#14B8A6",
+    desc: "检验工序增加工时 = 人数 × 每人工时",
     fields: [
       { k: "model", l: "产品型号", t: "text" },
       { k: "people", l: "人数", t: "num" },
@@ -678,7 +678,7 @@ function uploadRecordToCloud(record){
 // ==================== INTERVIEW FLOW ====================
 // steps: 0班组 1日期 2系统数据 3选择原因类型(多选) 4填写明细(统一) 5完成
 var TOTAL_STEPS = 6;
-var SEL_LABELS = { linshiList:"临时不记产", pinzhiList:"品质返工", jianyanList:"增加检验人员", biaoshiList:"标时不达成", otherList:"其他" };
+var SEL_LABELS = { linshiList:"临时不记产", pinzhiList:"品质返工（产品返工、维修）", jianyanList:"检验工序增加", biaoshiList:"标时不达成", otherList:"其他" };
 function stepTitle(s){ return ["选择班组","选择日期","系统数据","选择原因类型","填写明细","标时不达成总结","提交"][s]; }
 function selectedSections(){ return SECTION_ORDER.filter(function(sec){ return answers.sel && answers.sel[sec]; }); }
 function hasBiaoshi(){ return !!(answers.sel && answers.sel.biaoshiList && (answers.biaoshiList||[]).length>0); }
@@ -750,7 +750,7 @@ function renderSysStep(card){
     html+='</div>';
   } else {
     html+='<div class="analysis-grid" style="grid-template-columns:1fr">';
-    html+='<div class="analysis-item"><div class="analysis-item-label">模糊工时-系统数据</div><div class="analysis-item-value" style="color:#7C3AED">'+fmtNum(answers.sysMohu)+' h</div><div class="analysis-item-sub">需由 临时不记产/品质返工/标时不达成/其他 覆盖≥95%</div></div>';
+    html+='<div class="analysis-item"><div class="analysis-item-label">模糊工时-系统数据</div><div class="analysis-item-value" style="color:#7C3AED">'+fmtNum(answers.sysMohu)+' h</div><div class="analysis-item-sub">需由 临时不记产/品质返工/检验工序增加/标时不达成/其他 覆盖≥95%</div></div>';
     html+='</div>';
   }
   html+='<div id="nav-container"></div>';
@@ -768,7 +768,7 @@ function renderSelectStep(card){
   });
   html+='</div>';
   if (answers.sysLoaded){
-    html+='<div style="font-size:12px;color:#9CA3AF;margin-top:14px">模糊系统>0 时，请在 临时不记产 / 品质返工 / 标时不达成 / 其他 中勾选适用的项，使四类合计覆盖≥95%。当天无模糊工时的班组无需提交。</div>';
+    html+='<div style="font-size:12px;color:#9CA3AF;margin-top:14px">模糊系统>0 时，请在 临时不记产 / 品质返工（产品返工、维修） / 标时不达成 / 其他 中勾选适用的项，使四类合计覆盖≥95%。当天无模糊工时的班组无需提交。</div>';
   }
   html+='<div id="nav-container"></div>';
   card.innerHTML=html;
@@ -1067,9 +1067,9 @@ function renderCompletion(card){
   html+='<div style="text-align:left;margin:16px 0;padding:14px 16px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px">';
   html+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">覆盖率分析</div>';
   html+='<div class="analysis-grid" style="grid-template-columns:1fr">';
-  html+='<div class="analysis-item '+(sysMohu()<=0?'':(mc>=95?'ok':'warn'))+'"><div class="analysis-item-label">模糊覆盖率</div><div class="analysis-item-value" style="color:'+(mc>=95?'#10B981':'#EF4444')+'">'+(answers.sysLoaded?mc.toFixed(0)+'%':'—')+'</div><div class="analysis-item-sub">临时不记产+品质返工+标时不达成+其他 '+fmtNum(mohuTotal())+'h / 系统 '+fmtNum(answers.sysMohu)+'h</div></div>';
+  html+='<div class="analysis-item '+(sysMohu()<=0?'':(mc>=95?'ok':'warn'))+'"><div class="analysis-item-label">模糊覆盖率</div><div class="analysis-item-value" style="color:'+(mc>=95?'#10B981':'#EF4444')+'">'+(answers.sysLoaded?mc.toFixed(0)+'%':'—')+'</div><div class="analysis-item-sub">临时不记产+品质返工+检验工序增加+标时不达成+其他 '+fmtNum(mohuTotal())+'h / 系统 '+fmtNum(answers.sysMohu)+'h</div></div>';
   html+='</div>';
-  html+='<div style="font-size:12px;color:#6B7280">临时不记产 '+answers.linshiList.length+' 条 · 品质返工 '+answers.pinzhiList.length+' 条 · 标时不达成 '+answers.biaoshiList.length+' 条 · 其他 '+answers.otherList.length+' 条</div>';
+  html+='<div style="font-size:12px;color:#6B7280">临时不记产 '+answers.linshiList.length+' 条 · 品质返工 '+answers.pinzhiList.length+' 条 · 检验工序增加 '+answers.jianyanList.length+' 条 · 标时不达成 '+answers.biaoshiList.length+' 条 · 其他 '+answers.otherList.length+' 条</div>';
   html+='</div>';
 
   if (!cov.ok){
@@ -1127,7 +1127,7 @@ function sendDingTalkNotification(record){
   text+='| 指标 | 数值 |\n|:---|:---|\n';
   text+='| 模糊-系统 | '+fmtNum(record.sysMohu)+'h |\n';
   text+='| 临时不记产 | '+fmtNum(record.linshiTotal||0)+'h |\n';
-  text+='| 品质返工 | '+fmtNum(record.pinzhiTotal)+'h |\n';
+  text+='| 品质返工（产品返工、维修） | '+fmtNum(record.pinzhiTotal)+'h |\n';
   text+='| 标时不达成 | '+fmtNum(record.biaoshiTotal)+'h |\n';
   text+='| 其他 | '+fmtNum(record.otherTotal||0)+'h |\n';
   text+='| 模糊覆盖率 | **'+record.mohuCoverage.toFixed(0)+'%** |\n';
@@ -1324,7 +1324,7 @@ function renderDashboard(){
   var html=(cloudLoadError?'<div style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:600">⚠ 云端数据加载失败（网络或钉钉缓存问题），请点右上角「刷新」重试。</div>':'')+'<div class="kpi-grid">';
   html+=kpiCard('#EEF2FF','#4F46E5',iconTeam(),(dashboardTimeFilter==='day'?'班组数量':'时段数量'),data.length,'');
   html+=kpiCard('#F5F3FF','#7C3AED',iconClock(),'模糊覆盖率',avgM.toFixed(0)+'%','明细 '+fmtNum(totM)+'h / 系统 '+fmtNum(sysT.mohu)+'h');
-  html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','临时不记产 '+fmtNum(totLS)+'h · 品质返工 '+fmtNum(totPZ)+'h · 增加检验人员 '+fmtNum(totJY)+'h · 标时不达成 '+fmtNum(totBS)+'h'+(SHOW_OTHER?' · 其他 '+fmtNum(totOT)+'h':''));
+  html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','临时不记产 '+fmtNum(totLS)+'h · 品质返工 '+fmtNum(totPZ)+'h · 检验工序增加 '+fmtNum(totJY)+'h · 标时不达成 '+fmtNum(totBS)+'h'+(SHOW_OTHER?' · 其他 '+fmtNum(totOT)+'h':''));
   html+=kpiCard('#FEF2F2','#EF4444',iconWarn(),'未提交班组',unsubmitted.length,'应提交 '+expectedTeams.length+' 个');
   html+='</div>';
 
@@ -1351,7 +1351,7 @@ function renderDashboard(){
   // table
   var isDay=dashboardTimeFilter==='day';
   html+='<div class="table-card"><div class="table-header"><h3>数据明细</h3><span>'+(isDay?data.length+' 条记录':data.length+' 个班组')+'</span><button class="btn-export" data-action="exportData" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出明细</button></div>';
-  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>提交时间</th><th>模糊系统</th><th>临时不记产</th><th>品质返工</th><th>增加检验人员</th><th>标时不达成</th>'+(SHOW_OTHER?'<th>其他</th>':'')+'<th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
+  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>提交时间</th><th>模糊系统</th><th>临时不记产</th><th>品质返工（产品返工、维修）</th><th>检验工序增加</th><th>标时不达成</th>'+(SHOW_OTHER?'<th>其他</th>':'')+'<th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
   data.forEach(function(r){
     var ok=r.sysMohu<=0||r.mohuCoverage>=95;
     html+='<tr>';
@@ -1383,8 +1383,8 @@ function hasDetail(r){ return (r.linshiList&&r.linshiList.length)||(r.pinzhiList
 function detailBlock(r){
   var h='';
   if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
-  if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
-  if (r.jianyanList&&r.jianyanList.length){ h+='<div class="detail-content-title" style="color:#14B8A6">增加检验人员明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.jianyanList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.jianyanList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
+  if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">品质返工（产品返工、维修）明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
+  if (r.jianyanList&&r.jianyanList.length){ h+='<div class="detail-content-title" style="color:#14B8A6">检验工序增加明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.jianyanList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.jianyanList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'不达成'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（('+x.plan+'−'+x.actual+')÷'+x.std+'×'+x.people+'人）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
   if (r.biaoshiSummary){ h+='<div class="detail-content-title" style="color:#8B5CF6">当日标时不达成原因总结及对策分析</div><div style="font-size:12px;color:#374151;margin-bottom:10px;line-height:1.7">'+esc(r.biaoshiSummary)+'</div>'; }
   if (r.otherList&&r.otherList.length){ h+='<div class="detail-content-title" style="color:#EC4899">其他明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.otherList.map(function(x){ return x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.otherList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
@@ -1417,7 +1417,7 @@ function drawCompChart(id, ls, pz, jy, bs, ot){
   ls=ls||0; jy=jy||0; ot=ot||0;
   var total=ls+pz+jy+bs+ot; if(total<=0){ ctx.fillStyle="#9CA3AF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText("暂无模糊工时数据",w/2,h/2); return; }
   var cx=w/2-110, cy=h/2, oR=Math.min(w/2-110,h/2)-20, iR=oR*0.6;
-  var segs=[{name:"临时不记产",v:ls,color:"#F59E0B"},{name:"品质返工",v:pz,color:"#06B6D4"},{name:"增加检验人员",v:jy,color:"#14B8A6"},{name:"标时不达成",v:bs,color:"#8B5CF6"},{name:"其他",v:ot,color:"#EC4899"}].filter(function(x){return x.v>0;});
+  var segs=[{name:"临时不记产",v:ls,color:"#F59E0B"},{name:"品质返工",v:pz,color:"#06B6D4"},{name:"检验工序增加",v:jy,color:"#14B8A6"},{name:"标时不达成",v:bs,color:"#8B5CF6"},{name:"其他",v:ot,color:"#EC4899"}].filter(function(x){return x.v>0;});
   var a=-Math.PI/2; segs.forEach(function(d){ var ang=d.v/total*Math.PI*2; ctx.fillStyle=d.color; ctx.beginPath(); ctx.arc(cx,cy,oR,a,a+ang); ctx.arc(cx,cy,iR,a+ang,a,true); ctx.closePath(); ctx.fill(); a+=ang; });
   ctx.fillStyle="#111827"; ctx.font="bold 20px sans-serif"; ctx.textAlign="center"; ctx.fillText(Math.round(total)+"h",cx,cy+7);
   ctx.fillStyle="#6B7280"; ctx.font="11px sans-serif"; ctx.fillText("总模糊工时",cx,cy+22);
@@ -1638,14 +1638,14 @@ function buildExportRow(r){
   row[5]=ls.map(function(x){return x.position||'';}).join('；');
   row[6]=ls.map(function(x){return x.content||'';}).join('；');
   row[7]=r.linshiTotal!=null?Number(r.linshiTotal.toFixed(1)):(ls.reduce(function(s,x){return s+(Number(x.hours)||0);},0));
-  // 品质返工 I-M: 工时,产品型号,人数,每人工时,原因备注
+  // 品质返工（产品返工、维修） I-M: 工时,产品型号,人数,每人工时,原因备注
   var pz=r.pinzhiList||[];
   row[8]=r.pinzhiTotal!=null?Number(r.pinzhiTotal.toFixed(1)):pz.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.pinzhiList.calc(x));},0);
   row[9]=pz.map(function(x){return x.model||'';}).join('；');
   row[10]=pz.map(function(x){return x.people;}).join('；');
   row[11]=pz.map(function(x){return x.hoursPerPerson;}).join('；');
   row[12]=pz.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 增加检验人员 N-R: 工时,产品型号,人数,每人工时,原因备注
+  // 检验工序增加 N-R: 工时,产品型号,人数,每人工时,原因备注
   var jy=r.jianyanList||[];
   row[13]=r.jianyanTotal!=null?Number(r.jianyanTotal.toFixed(1)):jy.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.jianyanList.calc(x));},0);
   row[14]=jy.map(function(x){return x.model||'';}).join('；');
@@ -1672,8 +1672,8 @@ function buildExportRow(r){
 }
 function exportTemplateXLSX(recs, filename){
   loadSheetJS(function(failed){
-    var header1=['日期','提交时间','班组','模糊工时-系统数据','临时不记产','','','','品质返工','','','','','增加检验人员','','','','','标时不达成','','','','','','其他','','','标时不达成原因总结及对策'];
-    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','增加检验人员工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
+    var header1=['日期','提交时间','班组','模糊工时-系统数据','临时不记产','','','','品质返工（产品返工、维修）','','','','','检验工序增加','','','','','标时不达成','','','','','','其他','','','标时不达成原因总结及对策'];
+    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','合计工时','产品型号','人数','每人工时','原因备注','合计工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
     var dataRows=recs.map(buildExportRow);
     if(failed||!window.XLSX){
       var csv=''+header2.join(',')+'\n'+dataRows.map(function(row){ return row.map(function(c){ var s=String(c==null?'':c); if(/[",\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }).join(','); }).join('\n');
