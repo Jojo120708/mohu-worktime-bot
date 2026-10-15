@@ -386,6 +386,17 @@ var SECTION_DEFS = {
     ],
     calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
   },
+  jianyanList: {
+    title: "模糊工时-增加检验人员明细", color: "#14B8A6",
+    desc: "增加检验人员工时 = 人数 × 每人工时",
+    fields: [
+      { k: "model", l: "产品型号", t: "text" },
+      { k: "people", l: "人数", t: "num" },
+      { k: "hoursPerPerson", l: "每人工时(小时)", t: "num" },
+      { k: "note", l: "原因备注", t: "text" }
+    ],
+    calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
+  },
   biaoshiList: {
     title: "模糊工时-标时不达成明细", color: "#8B5CF6",
     desc: "不达成工时 = (计划量 − 生产数量) ÷ 标时 × 人数",
@@ -415,7 +426,7 @@ var SECTION_DEFS = {
     calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
   }
 };
-var SECTION_ORDER = ["linshiList", "pinzhiList", "biaoshiList", "otherList"];
+var SECTION_ORDER = ["linshiList", "pinzhiList", "jianyanList", "biaoshiList", "otherList"];
 
 // ==================== STATE ====================
 var records = [];
@@ -518,7 +529,7 @@ function secTotal(section){
   return t;
 }
 function sysMohu(){ return Number(answers.sysMohu) || 0; }
-function mohuTotal(){ return secTotal('linshiList') + secTotal('pinzhiList') + secTotal('biaoshiList') + secTotal('otherList'); }
+function mohuTotal(){ return secTotal('linshiList') + secTotal('pinzhiList') + secTotal('jianyanList') + secTotal('biaoshiList') + secTotal('otherList'); }
 function mohuCoverage(){ var s=sysMohu(); return s>0 ? (mohuTotal()/s)*100 : 100; }
 
 // ==================== CLOUD: generic fetch ====================
@@ -667,14 +678,14 @@ function uploadRecordToCloud(record){
 // ==================== INTERVIEW FLOW ====================
 // steps: 0班组 1日期 2系统数据 3选择原因类型(多选) 4填写明细(统一) 5完成
 var TOTAL_STEPS = 6;
-var SEL_LABELS = { linshiList:"模糊工时-临时不记产", pinzhiList:"模糊工时-品质返工", biaoshiList:"模糊工时-标时不达成", otherList:"模糊工时-其他" };
+var SEL_LABELS = { linshiList:"模糊工时-临时不记产", pinzhiList:"模糊工时-品质返工", jianyanList:"模糊工时-增加检验人员", biaoshiList:"模糊工时-标时不达成", otherList:"模糊工时-其他" };
 function stepTitle(s){ return ["选择班组","选择日期","系统数据","选择原因类型","填写明细","标时不达成总结","提交"][s]; }
 function selectedSections(){ return SECTION_ORDER.filter(function(sec){ return answers.sel && answers.sel[sec]; }); }
 function hasBiaoshi(){ return !!(answers.sel && answers.sel.biaoshiList && (answers.biaoshiList||[]).length>0); }
 function totalSteps(){ return hasBiaoshi()?7:6; }
 
 function startInterview(){
-  currentStep=0; answers={ teamName:"", date:"", sysMohu:null, sysLoaded:false, biaoshiSummary:"", sel:{ linshiList:false, pinzhiList:false, biaoshiList:false, otherList:false }, linshiList:[], pinzhiList:[], biaoshiList:[], otherList:[] };
+  currentStep=0; answers={ teamName:"", date:"", sysMohu:null, sysLoaded:false, biaoshiSummary:"", sel:{ linshiList:false, pinzhiList:false, jianyanList:false, biaoshiList:false, otherList:false }, linshiList:[], pinzhiList:[], jianyanList:[], biaoshiList:[], otherList:[] };
   isSubmitted=false;
   document.getElementById("welcome").classList.add("hidden");
   document.getElementById("dashboard").classList.add("hidden");
@@ -1089,10 +1100,12 @@ function submitInterview(){
     sysMohu: sysMohu(),
     linshiList: answers.linshiList.map(function(x){ return {name:x.name,position:x.position,content:x.content,hours:Number(x.hours)||0}; }),
     pinzhiList: answers.pinzhiList.map(function(x){ return {model:x.model,people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.pinzhiList.calc(x)}; }),
+    jianyanList: answers.jianyanList.map(function(x){ return {model:x.model,people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.jianyanList.calc(x)}; }),
     biaoshiList: answers.biaoshiList.map(function(x){ return {product:x.product||"",plan:Number(x.plan)||0,actual:Number(x.actual)||0,std:Number(x.std)||0,people:Number(x.people)||0,note:x.note||"",hours:SECTION_DEFS.biaoshiList.calc(x)}; }),
     otherList: answers.otherList.map(function(x){ return {people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.otherList.calc(x)}; }),
     linshiTotal: secTotal('linshiList'),
     pinzhiTotal: secTotal('pinzhiList'),
+    jianyanTotal: secTotal('jianyanList'),
     biaoshiTotal: secTotal('biaoshiList'),
     otherTotal: secTotal('otherList'),
     mohuTotal: mohuTotal(),
@@ -1223,12 +1236,12 @@ function aggregate(records, dim){
   filtered.forEach(function(r){
     var tk = dim==='week'? getISOWeek(r.date): getMonthKey(r.date);
     var key=(r.teamName||"未知")+"|"+tk;
-    if(!groups[key]){ groups[key]={ key:key,label:r.teamName||"未知",teamName:r.teamName||"未知",date:tk,sysMohu:0,linshiTotal:0,pinzhiTotal:0,biaoshiTotal:0,otherTotal:0,mohuTotal:0,linshiList:[],pinzhiList:[],biaoshiList:[],otherList:[],biaoshiSummary:'',_c:0 }; order.push(key); }
+    if(!groups[key]){ groups[key]={ key:key,label:r.teamName||"未知",teamName:r.teamName||"未知",date:tk,sysMohu:0,linshiTotal:0,pinzhiTotal:0,jianyanTotal:0,biaoshiTotal:0,otherTotal:0,mohuTotal:0,linshiList:[],pinzhiList:[],jianyanList:[],biaoshiList:[],otherList:[],biaoshiSummary:'',_c:0 }; order.push(key); }
     var g=groups[key];
     g.sysMohu+=r.sysMohu||0;
     if(r.biaoshiSummary){ g.biaoshiSummary += (g.biaoshiSummary?' ｜ ':'')+(r.date||'')+'：'+r.biaoshiSummary; }
-    g.linshiTotal+=r.linshiTotal||0; g.pinzhiTotal+=r.pinzhiTotal||0; g.biaoshiTotal+=r.biaoshiTotal||0; g.otherTotal+=r.otherTotal||0; g.mohuTotal+=r.mohuTotal||0;
-    g.linshiList=g.linshiList.concat(r.linshiList||[]); g.pinzhiList=g.pinzhiList.concat(r.pinzhiList||[]); g.biaoshiList=g.biaoshiList.concat(r.biaoshiList||[]); g.otherList=g.otherList.concat(r.otherList||[]);
+    g.linshiTotal+=r.linshiTotal||0; g.pinzhiTotal+=r.pinzhiTotal||0; g.jianyanTotal+=r.jianyanTotal||0; g.biaoshiTotal+=r.biaoshiTotal||0; g.otherTotal+=r.otherTotal||0; g.mohuTotal+=r.mohuTotal||0;
+    g.linshiList=g.linshiList.concat(r.linshiList||[]); g.pinzhiList=g.pinzhiList.concat(r.pinzhiList||[]); g.jianyanList=g.jianyanList.concat(r.jianyanList||[]); g.biaoshiList=g.biaoshiList.concat(r.biaoshiList||[]); g.otherList=g.otherList.concat(r.otherList||[]);
     g._c++;
   });
   return order.map(function(k){ var g=groups[k]; g.mohuCoverage=g.sysMohu>0?g.mohuTotal/g.sysMohu*100:100; return g; });
@@ -1300,8 +1313,8 @@ function renderDashboard(){
   else rangeText=getMonthLabel(dashboardDateFilter);
   document.getElementById("dashboard-sub").textContent='共 '+data.length+' '+(dashboardTimeFilter==='day'?'条记录':'个班组')+' · '+rangeText;
 
-  var totSysM=0,totM=0,totLS=0,totPZ=0,totBS=0,totOT=0;
-  data.forEach(function(r){ totSysM+=r.sysMohu||0; totM+=r.mohuTotal||0; totLS+=r.linshiTotal||0; totPZ+=r.pinzhiTotal||0; totBS+=r.biaoshiTotal||0; totOT+=r.otherTotal||0; });
+  var totSysM=0,totM=0,totLS=0,totPZ=0,totJY=0,totBS=0,totOT=0;
+  data.forEach(function(r){ totSysM+=r.sysMohu||0; totM+=r.mohuTotal||0; totLS+=r.linshiTotal||0; totPZ+=r.pinzhiTotal||0; totJY+=r.jianyanTotal||0; totBS+=r.biaoshiTotal||0; totOT+=r.otherTotal||0; });
   var sysT=sysTotalsForView();
   var avgM=sysT.mohu>0?totM/sysT.mohu*100:100;
   var expectedTeams = sysTeamsForView();
@@ -1311,7 +1324,7 @@ function renderDashboard(){
   var html=(cloudLoadError?'<div style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:600">⚠ 云端数据加载失败（网络或钉钉缓存问题），请点右上角「刷新」重试。</div>':'')+'<div class="kpi-grid">';
   html+=kpiCard('#EEF2FF','#4F46E5',iconTeam(),(dashboardTimeFilter==='day'?'班组数量':'时段数量'),data.length,'');
   html+=kpiCard('#F5F3FF','#7C3AED',iconClock(),'模糊覆盖率',avgM.toFixed(0)+'%','明细 '+fmtNum(totM)+'h / 系统 '+fmtNum(sysT.mohu)+'h');
-  html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','临时不记产 '+fmtNum(totLS)+'h · 品质返工 '+fmtNum(totPZ)+'h · 标时不达成 '+fmtNum(totBS)+'h'+(SHOW_OTHER?' · 其他 '+fmtNum(totOT)+'h':''));
+  html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','临时不记产 '+fmtNum(totLS)+'h · 品质返工 '+fmtNum(totPZ)+'h · 增加检验人员 '+fmtNum(totJY)+'h · 标时不达成 '+fmtNum(totBS)+'h'+(SHOW_OTHER?' · 其他 '+fmtNum(totOT)+'h':''));
   html+=kpiCard('#FEF2F2','#EF4444',iconWarn(),'未提交班组',unsubmitted.length,'应提交 '+expectedTeams.length+' 个');
   html+='</div>';
 
@@ -1338,7 +1351,7 @@ function renderDashboard(){
   // table
   var isDay=dashboardTimeFilter==='day';
   html+='<div class="table-card"><div class="table-header"><h3>数据明细</h3><span>'+(isDay?data.length+' 条记录':data.length+' 个班组')+'</span><button class="btn-export" data-action="exportData" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出明细</button></div>';
-  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>提交时间</th><th>模糊系统</th><th>临时不记产</th><th>品质返工</th><th>标时不达成</th>'+(SHOW_OTHER?'<th>其他</th>':'')+'<th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
+  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>提交时间</th><th>模糊系统</th><th>临时不记产</th><th>品质返工</th><th>增加检验人员</th><th>标时不达成</th>'+(SHOW_OTHER?'<th>其他</th>':'')+'<th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
   data.forEach(function(r){
     var ok=r.sysMohu<=0||r.mohuCoverage>=95;
     html+='<tr>';
@@ -1348,6 +1361,7 @@ function renderDashboard(){
     html+='<td>'+fmtNum(r.sysMohu)+'</td>';
     html+='<td>'+fmtNum(r.linshiTotal||0)+'</td>';
     html+='<td>'+fmtNum(r.pinzhiTotal)+'</td>';
+    html+='<td>'+fmtNum(r.jianyanTotal||0)+'</td>';
     html+='<td>'+fmtNum(r.biaoshiTotal)+'</td>';
     if(SHOW_OTHER) html+='<td>'+fmtNum(r.otherTotal||0)+'</td>';
     html+='<td style="font-weight:600;color:'+(r.sysMohu>0?covColor(r.mohuCoverage):'#9CA3AF')+'">'+(r.sysMohu>0?r.mohuCoverage.toFixed(0)+'%':'—')+'</td>';
@@ -1356,20 +1370,21 @@ function renderDashboard(){
     html+='</tr>';
     var rk=esc(r.key||r.teamName+'|'+r.date);
     if (showDetailId===rk && hasDetail(r)){
-      html+='<tr class="detail-row"><td colspan="'+((isDay?11:10)-(SHOW_OTHER?0:1))+'"><div class="detail-content">'+detailBlock(r)+'</div></td></tr>';
+      html+='<tr class="detail-row"><td colspan="'+((isDay?12:11)-(SHOW_OTHER?0:1))+'"><div class="detail-content">'+detailBlock(r)+'</div></td></tr>';
     }
   });
   html+='</tbody></table></div></div>';
 
   document.getElementById("dashboard-content").innerHTML=html;
   var tus=document.getElementById('team-unsub-select'); if(tus) tus.addEventListener('change', function(){ boardTeamFilter=this.value; renderDashboard(); });
-  setTimeout(function(){ drawCovChart('c-mohu', data, 'mohu'); drawCompChart('c-comp', totLS, totPZ, totBS, totOT); },50);
+  setTimeout(function(){ drawCovChart('c-mohu', data, 'mohu'); drawCompChart('c-comp', totLS, totPZ, totJY, totBS, totOT); },50);
 }
-function hasDetail(r){ return (r.linshiList&&r.linshiList.length)||(r.pinzhiList&&r.pinzhiList.length)||(r.biaoshiList&&r.biaoshiList.length)||(r.otherList&&r.otherList.length); }
+function hasDetail(r){ return (r.linshiList&&r.linshiList.length)||(r.pinzhiList&&r.pinzhiList.length)||(r.jianyanList&&r.jianyanList.length)||(r.biaoshiList&&r.biaoshiList.length)||(r.otherList&&r.otherList.length); }
 function detailBlock(r){
   var h='';
   if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">模糊工时-临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
   if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">模糊工时-品质返工明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
+  if (r.jianyanList&&r.jianyanList.length){ h+='<div class="detail-content-title" style="color:#14B8A6">模糊工时-增加检验人员明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.jianyanList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.jianyanList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   if (r.biaoshiList&&r.biaoshiList.length){ h+='<div class="detail-content-title" style="color:#8B5CF6">模糊工时-标时不达成明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.biaoshiList.map(function(x){ return (x.product? esc(x.product)+'：':'')+'不达成'+fmtNum(x.hours||SECTION_DEFS.biaoshiList.calc(x))+'h（('+x.plan+'−'+x.actual+')÷'+x.std+'×'+x.people+'人）'+(x.note?' '+esc(x.note):''); }).join('<br/>')+'</div>'; }
   if (r.biaoshiSummary){ h+='<div class="detail-content-title" style="color:#8B5CF6">当日标时不达成原因总结及对策分析</div><div style="font-size:12px;color:#374151;margin-bottom:10px;line-height:1.7">'+esc(r.biaoshiSummary)+'</div>'; }
   if (r.otherList&&r.otherList.length){ h+='<div class="detail-content-title" style="color:#EC4899">模糊工时-其他明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.otherList.map(function(x){ return x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.otherList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
@@ -1397,12 +1412,12 @@ function drawCovChart(id, data, metric){
     ctx.fillStyle="#374151"; ctx.textAlign="left"; ctx.fillText(r.rate.toFixed(0)+'%',pad.left+bw+6,y+bh/2+4);
   });
 }
-function drawCompChart(id, ls, pz, bs, ot){
+function drawCompChart(id, ls, pz, jy, bs, ot){
   var s=setupCanvas(id); if(!s) return; var ctx=s.ctx,w=s.w,h=s.h; ctx.clearRect(0,0,w,h);
-  ls=ls||0; ot=ot||0;
-  var total=ls+pz+bs+ot; if(total<=0){ ctx.fillStyle="#9CA3AF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText("暂无模糊工时数据",w/2,h/2); return; }
+  ls=ls||0; jy=jy||0; ot=ot||0;
+  var total=ls+pz+jy+bs+ot; if(total<=0){ ctx.fillStyle="#9CA3AF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText("暂无模糊工时数据",w/2,h/2); return; }
   var cx=w/2-110, cy=h/2, oR=Math.min(w/2-110,h/2)-20, iR=oR*0.6;
-  var segs=[{name:"临时不记产",v:ls,color:"#F59E0B"},{name:"品质返工",v:pz,color:"#06B6D4"},{name:"标时不达成",v:bs,color:"#8B5CF6"},{name:"其他",v:ot,color:"#EC4899"}].filter(function(x){return x.v>0;});
+  var segs=[{name:"临时不记产",v:ls,color:"#F59E0B"},{name:"品质返工",v:pz,color:"#06B6D4"},{name:"增加检验人员",v:jy,color:"#14B8A6"},{name:"标时不达成",v:bs,color:"#8B5CF6"},{name:"其他",v:ot,color:"#EC4899"}].filter(function(x){return x.v>0;});
   var a=-Math.PI/2; segs.forEach(function(d){ var ang=d.v/total*Math.PI*2; ctx.fillStyle=d.color; ctx.beginPath(); ctx.arc(cx,cy,oR,a,a+ang); ctx.arc(cx,cy,iR,a+ang,a,true); ctx.closePath(); ctx.fill(); a+=ang; });
   ctx.fillStyle="#111827"; ctx.font="bold 20px sans-serif"; ctx.textAlign="center"; ctx.fillText(Math.round(total)+"h",cx,cy+7);
   ctx.fillStyle="#6B7280"; ctx.font="11px sans-serif"; ctx.fillText("总模糊工时",cx,cy+22);
@@ -1614,7 +1629,7 @@ function clearAllCloudData(){
 // ==================== XLSX EXPORT (20列，匹配分析表) ====================
 function loadSheetJS(cb){ if(window.XLSX) return cb(); var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload=function(){cb();}; s.onerror=function(){cb(true);}; document.head.appendChild(s); }
 function buildExportRow(r){
-  var row=new Array(25).fill('');
+  var row=new Array(30).fill('');
   row[0]=r.date||''; row[1]=r.submitTime||''; row[2]=r.teamName||'';
   row[3]=r.sysMohu!=null?r.sysMohu:'';
   // 模糊工时-临时不记产 E-H: 姓名,岗位,工作内容,工时
@@ -1630,36 +1645,43 @@ function buildExportRow(r){
   row[10]=pz.map(function(x){return x.people;}).join('；');
   row[11]=pz.map(function(x){return x.hoursPerPerson;}).join('；');
   row[12]=pz.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 模糊工时-标时不达成 N-T: 影响合计,产品名称,计划量,生产数量,标时,人数,原因备注
+  // 模糊工时-增加检验人员 N-R: 工时,产品型号,人数,每人工时,原因备注
+  var jy=r.jianyanList||[];
+  row[13]=r.jianyanTotal!=null?Number(r.jianyanTotal.toFixed(1)):jy.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.jianyanList.calc(x));},0);
+  row[14]=jy.map(function(x){return x.model||'';}).join('；');
+  row[15]=jy.map(function(x){return x.people;}).join('；');
+  row[16]=jy.map(function(x){return x.hoursPerPerson;}).join('；');
+  row[17]=jy.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  // 模糊工时-标时不达成 S-Y: 影响合计,产品名称,计划量,生产数量,标时,人数,原因备注
   var bs=r.biaoshiList||[];
-  row[13]=r.biaoshiTotal!=null?Number(r.biaoshiTotal.toFixed(1)):bs.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.biaoshiList.calc(x));},0);
-  row[14]=bs.map(function(x){return x.product||'';}).join('；');
-  row[15]=bs.map(function(x){return x.plan;}).join('；');
-  row[16]=bs.map(function(x){return x.actual;}).join('；');
-  row[17]=bs.map(function(x){return x.std;}).join('；');
-  row[18]=bs.map(function(x){return x.people;}).join('；');
-  row[19]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 模糊工时-其他 U-X: 合计工时,人数,每人工时,原因
+  row[18]=r.biaoshiTotal!=null?Number(r.biaoshiTotal.toFixed(1)):bs.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.biaoshiList.calc(x));},0);
+  row[19]=bs.map(function(x){return x.product||'';}).join('；');
+  row[20]=bs.map(function(x){return x.plan;}).join('；');
+  row[21]=bs.map(function(x){return x.actual;}).join('；');
+  row[22]=bs.map(function(x){return x.std;}).join('；');
+  row[23]=bs.map(function(x){return x.people;}).join('；');
+  row[24]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  // 模糊工时-其他 Z-AC: 合计工时,人数,每人工时,原因
   var ot=r.otherList||[];
-  row[20]=r.otherTotal!=null?Number(r.otherTotal.toFixed(1)):ot.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.otherList.calc(x));},0);
-  row[21]=ot.map(function(x){return x.people;}).join('；');
-  row[22]=ot.map(function(x){return x.hoursPerPerson;}).join('；');
-  row[23]=ot.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  row[24]=r.biaoshiSummary||'';
+  row[25]=r.otherTotal!=null?Number(r.otherTotal.toFixed(1)):ot.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.otherList.calc(x));},0);
+  row[26]=ot.map(function(x){return x.people;}).join('；');
+  row[27]=ot.map(function(x){return x.hoursPerPerson;}).join('；');
+  row[28]=ot.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  row[29]=r.biaoshiSummary||'';
   return row;
 }
 function exportTemplateXLSX(recs, filename){
   loadSheetJS(function(failed){
-    var header1=['日期','提交时间','班组','模糊工时-系统数据','模糊工时-临时不记产','','','','模糊工时-品质返工','','','','','模糊工时-标时不达成','','','','','','模糊工时-其他','','','标时不达成原因总结及对策'];
-    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
+    var header1=['日期','提交时间','班组','模糊工时-系统数据','模糊工时-临时不记产','','','','模糊工时-品质返工','','','','','模糊工时-增加检验人员','','','','','模糊工时-标时不达成','','','','','','模糊工时-其他','','','标时不达成原因总结及对策'];
+    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','工时','品质返工工时','产品型号','人数','每人工时','原因备注','增加检验人员工时','产品型号','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
     var dataRows=recs.map(buildExportRow);
     if(failed||!window.XLSX){
       var csv=''+header2.join(',')+'\n'+dataRows.map(function(row){ return row.map(function(c){ var s=String(c==null?'':c); if(/[",\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }).join(','); }).join('\n');
       var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=filename.replace('.xlsx','.csv'); document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); return;
     }
     var aoa=[header1,header2].concat(dataRows); var ws=XLSX.utils.aoa_to_sheet(aoa);
-    var merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},{s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:0,c:7}},{s:{r:0,c:8},e:{r:0,c:12}},{s:{r:0,c:13},e:{r:0,c:19}},{s:{r:0,c:20},e:{r:0,c:23}},{s:{r:0,c:24},e:{r:1,c:24}}];
-    ws['!merges']=merges; var widths=[]; for(var i=0;i<25;i++) widths.push({wch:i<3?12:(i===24?24:14)}); ws['!cols']=widths;
+    var merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},{s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:0,c:7}},{s:{r:0,c:8},e:{r:0,c:12}},{s:{r:0,c:13},e:{r:0,c:17}},{s:{r:0,c:18},e:{r:0,c:24}},{s:{r:0,c:25},e:{r:0,c:28}},{s:{r:0,c:29},e:{r:1,c:29}}];
+    ws['!merges']=merges; var widths=[]; for(var i=0;i<30;i++) widths.push({wch:i<3?12:(i===29?24:14)}); ws['!cols']=widths;
     var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1'); XLSX.writeFile(wb,filename);
   });
 }
