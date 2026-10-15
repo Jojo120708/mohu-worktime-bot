@@ -364,17 +364,6 @@ var SHOW_OTHER = false;
 
 // 明细区块定义
 var SECTION_DEFS = {
-  linshiList: {
-    title: "临时不记产明细", color: "#F59E0B",
-    desc: "临时不记产（不含系统已统计）：逐条填写 姓名 / 岗位 / 工作内容 / 工时",
-    fields: [
-      { k: "name", l: "姓名", t: "text" },
-      { k: "position", l: "岗位", t: "text" },
-      { k: "content", l: "工作内容", t: "text" },
-      { k: "hours", l: "工时(小时)", t: "num" }
-    ],
-    calc: function(d){ return Number(d.hours) || 0; }
-  },
   pinzhiList: {
     title: "品质返工（产品返工、维修）明细", color: "#06B6D4",
     desc: "品质返工（产品返工、维修）工时 = 人数 × 每人工时",
@@ -456,7 +445,7 @@ var SECTION_DEFS = {
     calc: function(d){ return (Number(d.people)||0) * (Number(d.hoursPerPerson)||0); }
   }
 };
-var SECTION_ORDER = ["linshiList", "pinzhiList", "jianyanList", "fuZhuList", "peiXunList", "xinpinList", "biaoshiList", "otherList"];
+var SECTION_ORDER = ["pinzhiList", "jianyanList", "fuZhuList", "peiXunList", "xinpinList", "biaoshiList", "otherList"];
 
 // ==================== STATE ====================
 var records = [];
@@ -559,7 +548,7 @@ function secTotal(section){
   return t;
 }
 function sysMohu(){ return Number(answers.sysMohu) || 0; }
-function mohuTotal(){ return secTotal('linshiList') + secTotal('pinzhiList') + secTotal('jianyanList') + secTotal('fuZhuList') + secTotal('peiXunList') + secTotal('xinpinList') + secTotal('biaoshiList') + secTotal('otherList'); }
+function mohuTotal(){ return secTotal('pinzhiList') + secTotal('jianyanList') + secTotal('fuZhuList') + secTotal('peiXunList') + secTotal('xinpinList') + secTotal('biaoshiList') + secTotal('otherList'); }
 function mohuCoverage(){ var s=sysMohu(); return s>0 ? (mohuTotal()/s)*100 : 100; }
 
 // ==================== CLOUD: generic fetch ====================
@@ -708,14 +697,14 @@ function uploadRecordToCloud(record){
 // ==================== INTERVIEW FLOW ====================
 // steps: 0班组 1日期 2系统数据 3选择原因类型(多选) 4填写明细(统一) 5完成
 var TOTAL_STEPS = 6;
-var SEL_LABELS = { linshiList:"临时不记产", pinzhiList:"品质返工（产品返工、维修）", jianyanList:"检验工序增加", fuZhuList:"日常辅助事务", peiXunList:"新员工入职培训", xinpinList:"新品调试/试做", biaoshiList:"标时不达成", otherList:"其他" };
+var SEL_LABELS = { pinzhiList:"品质返工（产品返工、维修）", jianyanList:"检验工序增加", fuZhuList:"日常辅助事务", peiXunList:"新员工入职培训", xinpinList:"新品调试/试做", biaoshiList:"标时不达成", otherList:"其他" };
 function stepTitle(s){ return ["选择班组","选择日期","系统数据","选择原因类型","填写明细","标时不达成总结","提交"][s]; }
 function selectedSections(){ return SECTION_ORDER.filter(function(sec){ return answers.sel && answers.sel[sec]; }); }
 function hasBiaoshi(){ return !!(answers.sel && answers.sel.biaoshiList && (answers.biaoshiList||[]).length>0); }
 function totalSteps(){ return hasBiaoshi()?7:6; }
 
 function startInterview(){
-  currentStep=0; answers={ teamName:"", date:"", sysMohu:null, sysLoaded:false, biaoshiSummary:"", sel:{ linshiList:false, pinzhiList:false, jianyanList:false, fuZhuList:false, peiXunList:false, xinpinList:false, biaoshiList:false, otherList:false }, linshiList:[], pinzhiList:[], jianyanList:[], fuZhuList:[], peiXunList:[], xinpinList:[], biaoshiList:[], otherList:[] };
+  currentStep=0; answers={ teamName:"", date:"", sysMohu:null, sysLoaded:false, biaoshiSummary:"", sel:{ pinzhiList:false, jianyanList:false, fuZhuList:false, peiXunList:false, xinpinList:false, biaoshiList:false, otherList:false }, pinzhiList:[], jianyanList:[], fuZhuList:[], peiXunList:[], xinpinList:[], biaoshiList:[], otherList:[] };
   isSubmitted=false;
   document.getElementById("welcome").classList.add("hidden");
   document.getElementById("dashboard").classList.add("hidden");
@@ -780,7 +769,7 @@ function renderSysStep(card){
     html+='</div>';
   } else {
     html+='<div class="analysis-grid" style="grid-template-columns:1fr">';
-    html+='<div class="analysis-item"><div class="analysis-item-label">模糊工时-系统数据</div><div class="analysis-item-value" style="color:#7C3AED">'+fmtNum(answers.sysMohu)+' h</div><div class="analysis-item-sub">需由 临时不记产/品质返工/检验工序增加/日常辅助事务/新员工入职培训/新品调试试做/标时不达成/其他 覆盖≥95%</div></div>';
+    html+='<div class="analysis-item"><div class="analysis-item-label">模糊工时-系统数据</div><div class="analysis-item-value" style="color:#7C3AED">'+fmtNum(answers.sysMohu)+' h</div><div class="analysis-item-sub">需由 品质返工/检验工序增加/日常辅助事务/新员工入职培训/新品调试试做/标时不达成/其他 覆盖≥95%</div></div>';
     html+='</div>';
   }
   html+='<div id="nav-container"></div>';
@@ -798,7 +787,7 @@ function renderSelectStep(card){
   });
   html+='</div>';
   if (answers.sysLoaded){
-    html+='<div style="font-size:12px;color:#9CA3AF;margin-top:14px">模糊系统>0 时，请在 临时不记产 / 品质返工（产品返工、维修） / 标时不达成 / 其他 中勾选适用的项，使四类合计覆盖≥95%。当天无模糊工时的班组无需提交。</div>';
+    html+='<div style="font-size:12px;color:#9CA3AF;margin-top:14px">模糊系统>0 时，请在 品质返工（产品返工、维修） / 检验工序增加 / 日常辅助事务 / 新员工入职培训 / 新品调试·试做 / 标时不达成 / 其他 中勾选适用的项，使各类合计覆盖≥95%。当天无模糊工时的班组无需提交。</div>';
   }
   html+='<div id="nav-container"></div>';
   card.innerHTML=html;
@@ -1065,7 +1054,7 @@ function loadSysIntoAnswers(){
     if (ok && found){ answers.sysLoaded=true; answers.sysMohu=Number(found.mohu)||0; }
     else { answers.sysLoaded=false; answers.sysMohu=null; }
     // 原因类型由班组按当天实际自选（无模糊工时的班组不提交）
-    answers.sel = { linshiList:false, pinzhiList:false, jianyanList:false, fuZhuList:false, peiXunList:false, xinpinList:false, biaoshiList:false, otherList:false };
+    answers.sel = { pinzhiList:false, jianyanList:false, fuZhuList:false, peiXunList:false, xinpinList:false, biaoshiList:false, otherList:false };
     if (currentStep===2) renderInterview();
   });
 }
@@ -1099,7 +1088,7 @@ function renderCompletion(card){
   html+='<div class="analysis-grid" style="grid-template-columns:1fr">';
   html+='<div class="analysis-item '+(sysMohu()<=0?'':(mc>=95?'ok':'warn'))+'"><div class="analysis-item-label">模糊覆盖率</div><div class="analysis-item-value" style="color:'+(mc>=95?'#10B981':'#EF4444')+'">'+(answers.sysLoaded?mc.toFixed(0)+'%':'—')+'</div><div class="analysis-item-sub">各类明细合计 '+fmtNum(mohuTotal())+'h / 系统 '+fmtNum(answers.sysMohu)+'h</div></div>';
   html+='</div>';
-  html+='<div style="font-size:12px;color:#6B7280">临时不记产 '+answers.linshiList.length+' 条 · 品质返工 '+answers.pinzhiList.length+' 条 · 检验工序增加 '+answers.jianyanList.length+' 条 · 日常辅助事务 '+answers.fuZhuList.length+' 条 · 新员工入职培训 '+answers.peiXunList.length+' 条 · 新品调试/试做 '+answers.xinpinList.length+' 条 · 标时不达成 '+answers.biaoshiList.length+' 条 · 其他 '+answers.otherList.length+' 条</div>';
+  html+='<div style="font-size:12px;color:#6B7280">品质返工 '+answers.pinzhiList.length+' 条 · 检验工序增加 '+answers.jianyanList.length+' 条 · 日常辅助事务 '+answers.fuZhuList.length+' 条 · 新员工入职培训 '+answers.peiXunList.length+' 条 · 新品调试/试做 '+answers.xinpinList.length+' 条 · 标时不达成 '+answers.biaoshiList.length+' 条 · 其他 '+answers.otherList.length+' 条</div>';
   html+='</div>';
 
   if (!cov.ok){
@@ -1128,7 +1117,6 @@ function submitInterview(){
     id: Date.now(), submitTime: nowStr(),
     teamName: answers.teamName, date: answers.date,
     sysMohu: sysMohu(),
-    linshiList: answers.linshiList.map(function(x){ return {name:x.name,position:x.position,content:x.content,hours:Number(x.hours)||0}; }),
     pinzhiList: answers.pinzhiList.map(function(x){ return {model:x.model,people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.pinzhiList.calc(x)}; }),
     jianyanList: answers.jianyanList.map(function(x){ return {model:x.model,people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.jianyanList.calc(x)}; }),
     fuZhuList: answers.fuZhuList.map(function(x){ return {name:x.name||"",position:x.position||"",hours:Number(x.hours)||0}; }),
@@ -1136,7 +1124,6 @@ function submitInterview(){
     xinpinList: answers.xinpinList.map(function(x){ return {product:x.product||"",people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.xinpinList.calc(x)}; }),
     biaoshiList: answers.biaoshiList.map(function(x){ return {product:x.product||"",plan:Number(x.plan)||0,actual:Number(x.actual)||0,std:Number(x.std)||0,people:Number(x.people)||0,note:x.note||"",hours:SECTION_DEFS.biaoshiList.calc(x)}; }),
     otherList: answers.otherList.map(function(x){ return {people:Number(x.people)||0,hoursPerPerson:Number(x.hoursPerPerson)||0,note:x.note||"",hours:SECTION_DEFS.otherList.calc(x)}; }),
-    linshiTotal: secTotal('linshiList'),
     pinzhiTotal: secTotal('pinzhiList'),
     jianyanTotal: secTotal('jianyanList'),
     fuZhuTotal: secTotal('fuZhuList'),
@@ -1162,7 +1149,6 @@ function sendDingTalkNotification(record){
   var text='### '+esc(record.teamName)+' 模糊工时日报\n\n**日期：** '+record.date+'\n\n';
   text+='| 指标 | 数值 |\n|:---|:---|\n';
   text+='| 模糊-系统 | '+fmtNum(record.sysMohu)+'h |\n';
-  text+='| 临时不记产 | '+fmtNum(record.linshiTotal||0)+'h |\n';
   text+='| 品质返工（产品返工、维修） | '+fmtNum(record.pinzhiTotal)+'h |\n';
   text+='| 检验工序增加 | '+fmtNum(record.jianyanTotal||0)+'h |\n';
   text+='| 日常辅助事务 | '+fmtNum(record.fuZhuTotal||0)+'h |\n';
@@ -1276,12 +1262,12 @@ function aggregate(records, dim){
   filtered.forEach(function(r){
     var tk = dim==='week'? getISOWeek(r.date): getMonthKey(r.date);
     var key=(r.teamName||"未知")+"|"+tk;
-    if(!groups[key]){ groups[key]={ key:key,label:r.teamName||"未知",teamName:r.teamName||"未知",date:tk,sysMohu:0,linshiTotal:0,pinzhiTotal:0,jianyanTotal:0,fuZhuTotal:0,peiXunTotal:0,xinpinTotal:0,biaoshiTotal:0,otherTotal:0,mohuTotal:0,linshiList:[],pinzhiList:[],jianyanList:[],fuZhuList:[],peiXunList:[],xinpinList:[],biaoshiList:[],otherList:[],biaoshiSummary:'',_c:0 }; order.push(key); }
+    if(!groups[key]){ groups[key]={ key:key,label:r.teamName||"未知",teamName:r.teamName||"未知",date:tk,sysMohu:0,pinzhiTotal:0,jianyanTotal:0,fuZhuTotal:0,peiXunTotal:0,xinpinTotal:0,biaoshiTotal:0,otherTotal:0,mohuTotal:0,pinzhiList:[],jianyanList:[],fuZhuList:[],peiXunList:[],xinpinList:[],biaoshiList:[],otherList:[],biaoshiSummary:'',_c:0 }; order.push(key); }
     var g=groups[key];
     g.sysMohu+=r.sysMohu||0;
     if(r.biaoshiSummary){ g.biaoshiSummary += (g.biaoshiSummary?' ｜ ':'')+(r.date||'')+'：'+r.biaoshiSummary; }
-    g.linshiTotal+=r.linshiTotal||0; g.pinzhiTotal+=r.pinzhiTotal||0; g.jianyanTotal+=r.jianyanTotal||0; g.fuZhuTotal+=r.fuZhuTotal||0; g.peiXunTotal+=r.peiXunTotal||0; g.xinpinTotal+=r.xinpinTotal||0; g.biaoshiTotal+=r.biaoshiTotal||0; g.otherTotal+=r.otherTotal||0; g.mohuTotal+=r.mohuTotal||0;
-    g.linshiList=g.linshiList.concat(r.linshiList||[]); g.pinzhiList=g.pinzhiList.concat(r.pinzhiList||[]); g.jianyanList=g.jianyanList.concat(r.jianyanList||[]); g.fuZhuList=g.fuZhuList.concat(r.fuZhuList||[]); g.peiXunList=g.peiXunList.concat(r.peiXunList||[]); g.xinpinList=g.xinpinList.concat(r.xinpinList||[]); g.biaoshiList=g.biaoshiList.concat(r.biaoshiList||[]); g.otherList=g.otherList.concat(r.otherList||[]);
+    g.pinzhiTotal+=r.pinzhiTotal||0; g.jianyanTotal+=r.jianyanTotal||0; g.fuZhuTotal+=r.fuZhuTotal||0; g.peiXunTotal+=r.peiXunTotal||0; g.xinpinTotal+=r.xinpinTotal||0; g.biaoshiTotal+=r.biaoshiTotal||0; g.otherTotal+=r.otherTotal||0; g.mohuTotal+=r.mohuTotal||0;
+    g.pinzhiList=g.pinzhiList.concat(r.pinzhiList||[]); g.jianyanList=g.jianyanList.concat(r.jianyanList||[]); g.fuZhuList=g.fuZhuList.concat(r.fuZhuList||[]); g.peiXunList=g.peiXunList.concat(r.peiXunList||[]); g.xinpinList=g.xinpinList.concat(r.xinpinList||[]); g.biaoshiList=g.biaoshiList.concat(r.biaoshiList||[]); g.otherList=g.otherList.concat(r.otherList||[]);
     g._c++;
   });
   return order.map(function(k){ var g=groups[k]; g.mohuCoverage=g.sysMohu>0?g.mohuTotal/g.sysMohu*100:100; return g; });
@@ -1353,8 +1339,8 @@ function renderDashboard(){
   else rangeText=getMonthLabel(dashboardDateFilter);
   document.getElementById("dashboard-sub").textContent='共 '+data.length+' '+(dashboardTimeFilter==='day'?'条记录':'个班组')+' · '+rangeText;
 
-  var totSysM=0,totM=0,totLS=0,totPZ=0,totJY=0,totFZ=0,totPX=0,totXP=0,totBS=0,totOT=0;
-  data.forEach(function(r){ totSysM+=r.sysMohu||0; totM+=r.mohuTotal||0; totLS+=r.linshiTotal||0; totPZ+=r.pinzhiTotal||0; totJY+=r.jianyanTotal||0; totFZ+=r.fuZhuTotal||0; totPX+=r.peiXunTotal||0; totXP+=r.xinpinTotal||0; totBS+=r.biaoshiTotal||0; totOT+=r.otherTotal||0; });
+  var totSysM=0,totM=0,totPZ=0,totJY=0,totFZ=0,totPX=0,totXP=0,totBS=0,totOT=0;
+  data.forEach(function(r){ totSysM+=r.sysMohu||0; totM+=r.mohuTotal||0; totPZ+=r.pinzhiTotal||0; totJY+=r.jianyanTotal||0; totFZ+=r.fuZhuTotal||0; totPX+=r.peiXunTotal||0; totXP+=r.xinpinTotal||0; totBS+=r.biaoshiTotal||0; totOT+=r.otherTotal||0; });
   var sysT=sysTotalsForView();
   var avgM=sysT.mohu>0?totM/sysT.mohu*100:100;
   var expectedTeams = sysTeamsForView();
@@ -1364,7 +1350,7 @@ function renderDashboard(){
   var html=(cloudLoadError?'<div style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;font-weight:600">⚠ 云端数据加载失败（网络或钉钉缓存问题），请点右上角「刷新」重试。</div>':'')+'<div class="kpi-grid">';
   html+=kpiCard('#EEF2FF','#4F46E5',iconTeam(),(dashboardTimeFilter==='day'?'班组数量':'时段数量'),data.length,'');
   html+=kpiCard('#F5F3FF','#7C3AED',iconClock(),'模糊覆盖率',avgM.toFixed(0)+'%','明细 '+fmtNum(totM)+'h / 系统 '+fmtNum(sysT.mohu)+'h');
-  html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','临时不记产 '+fmtNum(totLS)+'h · 品质返工 '+fmtNum(totPZ)+'h · 检验工序增加 '+fmtNum(totJY)+'h · 日常辅助事务 '+fmtNum(totFZ)+'h · 新员工培训 '+fmtNum(totPX)+'h · 新品调试试做 '+fmtNum(totXP)+'h · 标时不达成 '+fmtNum(totBS)+'h'+(SHOW_OTHER?' · 其他 '+fmtNum(totOT)+'h':''));
+  html+=kpiCard('#F3F4F6','#6B7280',iconClock(),'总模糊工时',fmtNum(totM)+'h','品质返工 '+fmtNum(totPZ)+'h · 检验工序增加 '+fmtNum(totJY)+'h · 日常辅助事务 '+fmtNum(totFZ)+'h · 新员工培训 '+fmtNum(totPX)+'h · 新品调试试做 '+fmtNum(totXP)+'h · 标时不达成 '+fmtNum(totBS)+'h'+(SHOW_OTHER?' · 其他 '+fmtNum(totOT)+'h':''));
   html+=kpiCard('#FEF2F2','#EF4444',iconWarn(),'未提交班组',unsubmitted.length,'应提交 '+expectedTeams.length+' 个');
   html+='</div>';
 
@@ -1391,7 +1377,7 @@ function renderDashboard(){
   // table
   var isDay=dashboardTimeFilter==='day';
   html+='<div class="table-card"><div class="table-header"><h3>数据明细</h3><span>'+(isDay?data.length+' 条记录':data.length+' 个班组')+'</span><button class="btn-export" data-action="exportData" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出明细</button></div>';
-  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>提交时间</th><th>模糊系统</th><th>临时不记产</th><th>品质返工（产品返工、维修）</th><th>检验工序增加</th><th>日常辅助事务</th><th>新员工培训</th><th>新品调试试做</th><th>标时不达成</th>'+(SHOW_OTHER?'<th>其他</th>':'')+'<th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
+  html+='<div class="table-wrap"><table><thead><tr><th>班组</th>'+(isDay?'<th>日期</th>':'')+'<th>提交时间</th><th>模糊系统</th><th>品质返工（产品返工、维修）</th><th>检验工序增加</th><th>日常辅助事务</th><th>新员工培训</th><th>新品调试试做</th><th>标时不达成</th>'+(SHOW_OTHER?'<th>其他</th>':'')+'<th>模糊覆盖</th><th>状态</th><th></th></tr></thead><tbody>';
   data.forEach(function(r){
     var ok=r.sysMohu<=0||r.mohuCoverage>=95;
     html+='<tr>';
@@ -1399,7 +1385,6 @@ function renderDashboard(){
     if(isDay) html+='<td style="color:#6B7280;white-space:nowrap">'+esc(r.date)+'</td>';
     html+='<td style="color:#6B7280;font-size:12px;white-space:nowrap">'+esc(r.submitTime||'—')+'</td>';
     html+='<td>'+fmtNum(r.sysMohu)+'</td>';
-    html+='<td>'+fmtNum(r.linshiTotal||0)+'</td>';
     html+='<td>'+fmtNum(r.pinzhiTotal)+'</td>';
     html+='<td>'+fmtNum(r.jianyanTotal||0)+'</td>';
     html+='<td>'+fmtNum(r.fuZhuTotal||0)+'</td>';
@@ -1413,19 +1398,18 @@ function renderDashboard(){
     html+='</tr>';
     var rk=esc(r.key||r.teamName+'|'+r.date);
     if (showDetailId===rk && hasDetail(r)){
-      html+='<tr class="detail-row"><td colspan="'+((isDay?15:14)-(SHOW_OTHER?0:1))+'"><div class="detail-content">'+detailBlock(r)+'</div></td></tr>';
+      html+='<tr class="detail-row"><td colspan="'+((isDay?14:13)-(SHOW_OTHER?0:1))+'"><div class="detail-content">'+detailBlock(r)+'</div></td></tr>';
     }
   });
   html+='</tbody></table></div></div>';
 
   document.getElementById("dashboard-content").innerHTML=html;
   var tus=document.getElementById('team-unsub-select'); if(tus) tus.addEventListener('change', function(){ boardTeamFilter=this.value; renderDashboard(); });
-  setTimeout(function(){ drawCovChart('c-mohu', data, 'mohu'); drawCompChart('c-comp', totLS, totPZ, totJY, totFZ, totPX, totXP, totBS, totOT); },50);
+  setTimeout(function(){ drawCovChart('c-mohu', data, 'mohu'); drawCompChart('c-comp', totPZ, totJY, totFZ, totPX, totXP, totBS, totOT); },50);
 }
-function hasDetail(r){ return (r.linshiList&&r.linshiList.length)||(r.pinzhiList&&r.pinzhiList.length)||(r.jianyanList&&r.jianyanList.length)||(r.fuZhuList&&r.fuZhuList.length)||(r.peiXunList&&r.peiXunList.length)||(r.xinpinList&&r.xinpinList.length)||(r.biaoshiList&&r.biaoshiList.length)||(r.otherList&&r.otherList.length); }
+function hasDetail(r){ return (r.pinzhiList&&r.pinzhiList.length)||(r.jianyanList&&r.jianyanList.length)||(r.fuZhuList&&r.fuZhuList.length)||(r.peiXunList&&r.peiXunList.length)||(r.xinpinList&&r.xinpinList.length)||(r.biaoshiList&&r.biaoshiList.length)||(r.otherList&&r.otherList.length); }
 function detailBlock(r){
   var h='';
-  if (r.linshiList&&r.linshiList.length){ h+='<div class="detail-content-title" style="color:#F59E0B">临时不记产明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.linshiList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+esc(x.content)+' '+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
   if (r.pinzhiList&&r.pinzhiList.length){ h+='<div class="detail-content-title" style="color:#06B6D4">品质返工（产品返工、维修）明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.pinzhiList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.pinzhiList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   if (r.jianyanList&&r.jianyanList.length){ h+='<div class="detail-content-title" style="color:#14B8A6">检验工序增加明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.jianyanList.map(function(x){ return esc(x.model)+'：'+x.people+'人×'+x.hoursPerPerson+'h='+fmtNum(x.hours||SECTION_DEFS.jianyanList.calc(x))+'h'+(x.note?'（'+esc(x.note)+'）':''); }).join('<br/>')+'</div>'; }
   if (r.fuZhuList&&r.fuZhuList.length){ h+='<div class="detail-content-title" style="color:#84CC16">日常辅助事务明细</div><div style="font-size:12px;color:#374151;margin-bottom:10px">'+r.fuZhuList.map(function(x){ return esc(x.name)+'（'+esc(x.position)+'）：'+fmtNum(x.hours)+'h'; }).join('<br/>')+'</div>'; }
@@ -1458,12 +1442,12 @@ function drawCovChart(id, data, metric){
     ctx.fillStyle="#374151"; ctx.textAlign="left"; ctx.fillText(r.rate.toFixed(0)+'%',pad.left+bw+6,y+bh/2+4);
   });
 }
-function drawCompChart(id, ls, pz, jy, fz, px, xp, bs, ot){
+function drawCompChart(id, pz, jy, fz, px, xp, bs, ot){
   var s=setupCanvas(id); if(!s) return; var ctx=s.ctx,w=s.w,h=s.h; ctx.clearRect(0,0,w,h);
-  ls=ls||0; fz=fz||0; px=px||0; xp=xp||0; ot=ot||0;
-  var total=ls+pz+jy+fz+px+xp+bs+ot; if(total<=0){ ctx.fillStyle="#9CA3AF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText("暂无模糊工时数据",w/2,h/2); return; }
+  fz=fz||0; px=px||0; xp=xp||0; ot=ot||0;
+  var total=pz+jy+fz+px+xp+bs+ot; if(total<=0){ ctx.fillStyle="#9CA3AF"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.fillText("暂无模糊工时数据",w/2,h/2); return; }
   var cx=w/2-110, cy=h/2, oR=Math.min(w/2-110,h/2)-20, iR=oR*0.6;
-  var segs=[{name:"临时不记产",v:ls,color:"#F59E0B"},{name:"品质返工",v:pz,color:"#06B6D4"},{name:"检验工序增加",v:jy,color:"#14B8A6"},{name:"日常辅助事务",v:fz,color:"#84CC16"},{name:"新员工培训",v:px,color:"#3B82F6"},{name:"新品调试试做",v:xp,color:"#F97316"},{name:"标时不达成",v:bs,color:"#8B5CF6"},{name:"其他",v:ot,color:"#EC4899"}].filter(function(x){return x.v>0;});
+  var segs=[{name:"品质返工",v:pz,color:"#06B6D4"},{name:"检验工序增加",v:jy,color:"#14B8A6"},{name:"日常辅助事务",v:fz,color:"#84CC16"},{name:"新员工培训",v:px,color:"#3B82F6"},{name:"新品调试试做",v:xp,color:"#F97316"},{name:"标时不达成",v:bs,color:"#8B5CF6"},{name:"其他",v:ot,color:"#EC4899"}].filter(function(x){return x.v>0;});
   var a=-Math.PI/2; segs.forEach(function(d){ var ang=d.v/total*Math.PI*2; ctx.fillStyle=d.color; ctx.beginPath(); ctx.arc(cx,cy,oR,a,a+ang); ctx.arc(cx,cy,iR,a+ang,a,true); ctx.closePath(); ctx.fill(); a+=ang; });
   ctx.fillStyle="#111827"; ctx.font="bold 20px sans-serif"; ctx.textAlign="center"; ctx.fillText(Math.round(total)+"h",cx,cy+7);
   ctx.fillStyle="#6B7280"; ctx.font="11px sans-serif"; ctx.fillText("总模糊工时",cx,cy+22);
@@ -1486,8 +1470,8 @@ function renderCloudList(){
   var c=document.getElementById('cloud-data-content'); if(!c) return;
   var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="color:#374151;font-weight:600">共 '+cloudRecordsCache.length+' 条采集记录</span><div style="display:flex;gap:8px"><button class="btn-ghost" data-action="showSysImport">导入系统数据</button><button class="btn-ghost" data-action="showSysEditor">编辑已导入数据</button><button class="btn-export" data-action="exportAll">导出全部</button><button data-action="showAdminLogin" style="display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;border:1.5px solid #DC2626;background:#FEF2F2;font-size:12px;color:#DC2626;font-weight:600;cursor:pointer">管理</button></div></div>';
   if(!cloudRecordsCache.length){ c.innerHTML=h+'<div style="text-align:center;padding:30px 0;color:#9CA3AF">暂无采集记录。可先点“导入系统数据”导入 MES 的模糊工时，再开始采访。</div>'; return; }
-  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#F3F4F6"><th style="padding:8px 10px;text-align:left">日期</th><th style="padding:8px 10px;text-align:left">班组</th><th style="padding:8px 10px;text-align:right">临时不记产</th><th style="padding:8px 10px;text-align:right">模糊覆盖</th></tr></thead><tbody>';
-  cloudRecordsCache.forEach(function(r){ h+='<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 10px">'+esc(r.date)+'</td><td style="padding:8px 10px;font-weight:600">'+esc(r.teamName)+'</td><td style="padding:8px 10px;text-align:right">'+fmtNum(r.linshiTotal||0)+'h</td><td style="padding:8px 10px;text-align:right;color:'+covColor(r.mohuCoverage||0)+'">'+(r.mohuCoverage!=null?r.mohuCoverage.toFixed(0)+'%':'—')+'</td></tr>'; });
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#F3F4F6"><th style="padding:8px 10px;text-align:left">日期</th><th style="padding:8px 10px;text-align:left">班组</th><th style="padding:8px 10px;text-align:right">模糊明细/系统</th><th style="padding:8px 10px;text-align:right">模糊覆盖</th></tr></thead><tbody>';
+  cloudRecordsCache.forEach(function(r){ h+='<tr style="border-bottom:1px solid #F3F4F6"><td style="padding:8px 10px">'+esc(r.date)+'</td><td style="padding:8px 10px;font-weight:600">'+esc(r.teamName)+'</td><td style="padding:8px 10px;text-align:right">'+fmtNum(r.mohuTotal||0)+'/'+fmtNum(r.sysMohu||0)+'h</td><td style="padding:8px 10px;text-align:right;color:'+covColor(r.mohuCoverage||0)+'">'+(r.mohuCoverage!=null?r.mohuCoverage.toFixed(0)+'%':'—')+'</td></tr>'; });
   h+='</tbody></table></div>';
   c.innerHTML=h;
 }
@@ -1508,7 +1492,7 @@ function showAdminPanel(){
   if(!cloudRecordsCache.length){ h+='<div style="color:#9CA3AF;font-size:12px">暂无数据</div>'; }
   else {
     h+='<div style="max-height:360px;overflow-y:auto">';
-    cloudRecordsCache.forEach(function(r,i){ h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #F3F4F6"><div><div style="font-weight:600;font-size:13px">'+esc(r.teamName)+' <span style="font-weight:400;color:#6B7280;font-size:12px">'+esc(r.date)+'</span></div><div style="font-size:11px;color:#6B7280">临时不记产 '+fmtNum(r.linshiTotal||0)+'h · 模糊明细 '+fmtNum(r.mohuTotal)+'/'+fmtNum(r.sysMohu)+'h</div></div><button data-action="deleteCloudRecord" data-param="'+i+'" style="padding:4px 12px;border-radius:6px;border:1px solid #DC2626;background:#fff;color:#DC2626;font-size:11px;font-weight:600;cursor:pointer">删除</button></div>'; });
+    cloudRecordsCache.forEach(function(r,i){ h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid #F3F4F6"><div><div style="font-weight:600;font-size:13px">'+esc(r.teamName)+' <span style="font-weight:400;color:#6B7280;font-size:12px">'+esc(r.date)+'</span></div><div style="font-size:11px;color:#6B7280">模糊明细 '+fmtNum(r.mohuTotal)+'/'+fmtNum(r.sysMohu)+'h</div></div><button data-action="deleteCloudRecord" data-param="'+i+'" style="padding:4px 12px;border-radius:6px;border:1px solid #DC2626;background:#fff;color:#DC2626;font-size:11px;font-weight:600;cursor:pointer">删除</button></div>'; });
     h+='</div>';
   }
   h+='<div style="text-align:center;margin-top:16px"><button data-action="backToCloudData" style="padding:8px 24px;border-radius:8px;border:1.5px solid #D1D5DB;background:#fff;color:#374151;font-size:12px;font-weight:600;cursor:pointer">返回列表</button></div>';
@@ -1675,76 +1659,70 @@ function clearAllCloudData(){
 // ==================== XLSX EXPORT (20列，匹配分析表) ====================
 function loadSheetJS(cb){ if(window.XLSX) return cb(); var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload=function(){cb();}; s.onerror=function(){cb(true);}; document.head.appendChild(s); }
 function buildExportRow(r){
-  var row=new Array(41).fill('');
+  var row=new Array(37).fill('');
   row[0]=r.date||''; row[1]=r.submitTime||''; row[2]=r.teamName||'';
   row[3]=r.sysMohu!=null?r.sysMohu:'';
-  // 临时不记产 E-H: 姓名,岗位,工作内容,合计工时
-  var ls=r.linshiList||[];
-  row[4]=ls.map(function(x){return x.name||'';}).join('；');
-  row[5]=ls.map(function(x){return x.position||'';}).join('；');
-  row[6]=ls.map(function(x){return x.content||'';}).join('；');
-  row[7]=r.linshiTotal!=null?Number(r.linshiTotal.toFixed(1)):(ls.reduce(function(s,x){return s+(Number(x.hours)||0);},0));
-  // 品质返工 I-M: 合计工时,产品型号,人数,每人工时,原因备注
+  // 品质返工 E-I: 合计工时,产品型号,人数,每人工时,原因备注
   var pz=r.pinzhiList||[];
-  row[8]=r.pinzhiTotal!=null?Number(r.pinzhiTotal.toFixed(1)):pz.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.pinzhiList.calc(x));},0);
-  row[9]=pz.map(function(x){return x.model||'';}).join('；');
-  row[10]=pz.map(function(x){return x.people;}).join('；');
-  row[11]=pz.map(function(x){return x.hoursPerPerson;}).join('；');
-  row[12]=pz.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 检验工序增加 N-R: 合计工时,产品型号,人数,每人工时,原因备注
+  row[4]=r.pinzhiTotal!=null?Number(r.pinzhiTotal.toFixed(1)):pz.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.pinzhiList.calc(x));},0);
+  row[5]=pz.map(function(x){return x.model||'';}).join('；');
+  row[6]=pz.map(function(x){return x.people;}).join('；');
+  row[7]=pz.map(function(x){return x.hoursPerPerson;}).join('；');
+  row[8]=pz.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  // 检验工序增加 J-N: 合计工时,产品型号,人数,每人工时,原因备注
   var jy=r.jianyanList||[];
-  row[13]=r.jianyanTotal!=null?Number(r.jianyanTotal.toFixed(1)):jy.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.jianyanList.calc(x));},0);
-  row[14]=jy.map(function(x){return x.model||'';}).join('；');
-  row[15]=jy.map(function(x){return x.people;}).join('；');
-  row[16]=jy.map(function(x){return x.hoursPerPerson;}).join('；');
-  row[17]=jy.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 日常辅助事务 S-U: 姓名,岗位,合计工时
+  row[9]=r.jianyanTotal!=null?Number(r.jianyanTotal.toFixed(1)):jy.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.jianyanList.calc(x));},0);
+  row[10]=jy.map(function(x){return x.model||'';}).join('；');
+  row[11]=jy.map(function(x){return x.people;}).join('；');
+  row[12]=jy.map(function(x){return x.hoursPerPerson;}).join('；');
+  row[13]=jy.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  // 日常辅助事务 O-Q: 姓名,岗位,合计工时
   var fz=r.fuZhuList||[];
-  row[18]=fz.map(function(x){return x.name||'';}).join('；');
-  row[19]=fz.map(function(x){return x.position||'';}).join('；');
-  row[20]=r.fuZhuTotal!=null?Number(r.fuZhuTotal.toFixed(1)):fz.reduce(function(s,x){return s+(Number(x.hours)||0);},0);
-  // 新员工入职培训 V-X: 合计工时,新员工人数,每人出勤工时
+  row[14]=fz.map(function(x){return x.name||'';}).join('；');
+  row[15]=fz.map(function(x){return x.position||'';}).join('；');
+  row[16]=r.fuZhuTotal!=null?Number(r.fuZhuTotal.toFixed(1)):fz.reduce(function(s,x){return s+(Number(x.hours)||0);},0);
+  // 新员工入职培训 R-T: 合计工时,新员工人数,每人出勤工时
   var px=r.peiXunList||[];
-  row[21]=r.peiXunTotal!=null?Number(r.peiXunTotal.toFixed(1)):px.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.peiXunList.calc(x));},0);
-  row[22]=px.map(function(x){return x.people;}).join('；');
-  row[23]=px.map(function(x){return x.hoursPerPerson;}).join('；');
-  // 新品调试/试做 Y-AC: 合计工时,新品名称,人数,每人工时,原因备注
+  row[17]=r.peiXunTotal!=null?Number(r.peiXunTotal.toFixed(1)):px.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.peiXunList.calc(x));},0);
+  row[18]=px.map(function(x){return x.people;}).join('；');
+  row[19]=px.map(function(x){return x.hoursPerPerson;}).join('；');
+  // 新品调试/试做 U-Y: 合计工时,新品名称,人数,每人工时,原因备注
   var xp=r.xinpinList||[];
-  row[24]=r.xinpinTotal!=null?Number(r.xinpinTotal.toFixed(1)):xp.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.xinpinList.calc(x));},0);
-  row[25]=xp.map(function(x){return x.product||'';}).join('；');
-  row[26]=xp.map(function(x){return x.people;}).join('；');
-  row[27]=xp.map(function(x){return x.hoursPerPerson;}).join('；');
-  row[28]=xp.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 标时不达成 AD-AJ: 影响合计,产品名称,计划量,生产数量,标时,人数,原因备注
+  row[20]=r.xinpinTotal!=null?Number(r.xinpinTotal.toFixed(1)):xp.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.xinpinList.calc(x));},0);
+  row[21]=xp.map(function(x){return x.product||'';}).join('；');
+  row[22]=xp.map(function(x){return x.people;}).join('；');
+  row[23]=xp.map(function(x){return x.hoursPerPerson;}).join('；');
+  row[24]=xp.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  // 标时不达成 Z-AF: 影响合计,产品名称,计划量,生产数量,标时,人数,原因备注
   var bs=r.biaoshiList||[];
-  row[29]=r.biaoshiTotal!=null?Number(r.biaoshiTotal.toFixed(1)):bs.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.biaoshiList.calc(x));},0);
-  row[30]=bs.map(function(x){return x.product||'';}).join('；');
-  row[31]=bs.map(function(x){return x.plan;}).join('；');
-  row[32]=bs.map(function(x){return x.actual;}).join('；');
-  row[33]=bs.map(function(x){return x.std;}).join('；');
-  row[34]=bs.map(function(x){return x.people;}).join('；');
-  row[35]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  // 其他 AK-AN: 合计工时,人数,每人工时,原因
+  row[25]=r.biaoshiTotal!=null?Number(r.biaoshiTotal.toFixed(1)):bs.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.biaoshiList.calc(x));},0);
+  row[26]=bs.map(function(x){return x.product||'';}).join('；');
+  row[27]=bs.map(function(x){return x.plan;}).join('；');
+  row[28]=bs.map(function(x){return x.actual;}).join('；');
+  row[29]=bs.map(function(x){return x.std;}).join('；');
+  row[30]=bs.map(function(x){return x.people;}).join('；');
+  row[31]=bs.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  // 其他 AG-AJ: 合计工时,人数,每人工时,原因
   var ot=r.otherList||[];
-  row[36]=r.otherTotal!=null?Number(r.otherTotal.toFixed(1)):ot.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.otherList.calc(x));},0);
-  row[37]=ot.map(function(x){return x.people;}).join('；');
-  row[38]=ot.map(function(x){return x.hoursPerPerson;}).join('；');
-  row[39]=ot.map(function(x){return x.note||'';}).filter(Boolean).join('；');
-  row[40]=r.biaoshiSummary||'';
+  row[32]=r.otherTotal!=null?Number(r.otherTotal.toFixed(1)):ot.reduce(function(s,x){return s+(x.hours||SECTION_DEFS.otherList.calc(x));},0);
+  row[33]=ot.map(function(x){return x.people;}).join('；');
+  row[34]=ot.map(function(x){return x.hoursPerPerson;}).join('；');
+  row[35]=ot.map(function(x){return x.note||'';}).filter(Boolean).join('；');
+  row[36]=r.biaoshiSummary||'';
   return row;
 }
 function exportTemplateXLSX(recs, filename){
   loadSheetJS(function(failed){
-    var header1=['日期','提交时间','班组','模糊工时-系统数据','临时不记产','','','','品质返工（产品返工、维修）','','','','','检验工序增加','','','','','日常辅助事务','','','新员工入职培训','','','新品调试/试做','','','','','标时不达成','','','','','','','其他','','','','标时不达成原因总结及对策'];
-    var header2=['日期','提交时间','班组','每天导入','姓名','岗位','工作内容','合计工时','合计工时','产品型号','人数','每人工时','原因备注','合计工时','产品型号','人数','每人工时','原因备注','姓名','岗位','合计工时','合计工时','新员工人数','每人出勤工时','合计工时','新品名称','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
+    var header1=['日期','提交时间','班组','模糊工时-系统数据','品质返工（产品返工、维修）','','','','','检验工序增加','','','','','日常辅助事务','','','新员工入职培训','','','新品调试/试做','','','','','标时不达成','','','','','','','其他','','','','标时不达成原因总结及对策'];
+    var header2=['日期','提交时间','班组','每天导入','合计工时','产品型号','人数','每人工时','原因备注','合计工时','产品型号','人数','每人工时','原因备注','姓名','岗位','合计工时','合计工时','新员工人数','每人出勤工时','合计工时','新品名称','人数','每人工时','原因备注','标时不达成影响合计工时','产品名称','计划量','生产数量','标时','人数','原因备注','其他合计工时','人数','每人工时','原因',''];
     var dataRows=recs.map(buildExportRow);
     if(failed||!window.XLSX){
       var csv=''+header2.join(',')+'\n'+dataRows.map(function(row){ return row.map(function(c){ var s=String(c==null?'':c); if(/[",\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }).join(','); }).join('\n');
       var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=filename.replace('.xlsx','.csv'); document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); return;
     }
     var aoa=[header1,header2].concat(dataRows); var ws=XLSX.utils.aoa_to_sheet(aoa);
-    var merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},{s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:0,c:7}},{s:{r:0,c:8},e:{r:0,c:12}},{s:{r:0,c:13},e:{r:0,c:17}},{s:{r:0,c:18},e:{r:0,c:20}},{s:{r:0,c:21},e:{r:0,c:23}},{s:{r:0,c:24},e:{r:0,c:28}},{s:{r:0,c:29},e:{r:0,c:35}},{s:{r:0,c:36},e:{r:0,c:39}},{s:{r:0,c:40},e:{r:1,c:40}}];
-    ws['!merges']=merges; var widths=[]; for(var i=0;i<41;i++) widths.push({wch:i<3?12:(i===40?24:14)}); ws['!cols']=widths;
+    var merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},{s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:0,c:8}},{s:{r:0,c:9},e:{r:0,c:13}},{s:{r:0,c:14},e:{r:0,c:16}},{s:{r:0,c:17},e:{r:0,c:19}},{s:{r:0,c:20},e:{r:0,c:24}},{s:{r:0,c:25},e:{r:0,c:31}},{s:{r:0,c:32},e:{r:0,c:35}},{s:{r:0,c:36},e:{r:1,c:36}}];
+    ws['!merges']=merges; var widths=[]; for(var i=0;i<37;i++) widths.push({wch:i<3?12:(i===36?24:14)}); ws['!cols']=widths;
     var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1'); XLSX.writeFile(wb,filename);
   });
 }
