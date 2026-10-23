@@ -331,6 +331,10 @@ var RECORDS_BIN_ID = "6aa35e7bac6210605abed9b3";   // 模糊工时采集记录
 var SYSDATA_BIN_ID = "6aa35e7dac6210605abed9b4";   // 系统数据（不记产/模糊），后台导入
 var RECORDS_URL = "https://api.jsonbin.io/v3/b/" + RECORDS_BIN_ID;
 var SYSDATA_URL = "https://api.jsonbin.io/v3/b/" + SYSDATA_BIN_ID;
+// 按班组×月份分bin（根除并发覆盖丢失）：索引bin 映射 "班组|YYYY-MM" → binId；每个班组每月一个独立bin，各课长只写自己的bin，互不覆盖
+var TEAM_BINS_INDEX_ID = "6adb2815ac6210605a4b66e0";
+var TEAM_BINS_INDEX_URL = "https://api.jsonbin.io/v3/b/" + TEAM_BINS_INDEX_ID;
+var teamBinsIndex = null; // 内存缓存 { "班组|YYYY-MM": "binId" }
 // 按月归档：主bin裁剪掉的旧记录按所属月份写入对应归档bin（每月2个，防单bin超100KB）
 var ARCHIVE_BINS = {
   "2026-09": ["6acee5c8ac6210605a2f7a8a","6aceeab4ac6210605a2f832c"],
@@ -577,6 +581,59 @@ function fetchBin(url, delayMs, onDone){
   }, delayMs);
 }
 
+// ==================== 按班组×月份分bin：路由与读写 ====================
+function loadTeamIndex(cb){
+  fetchBin(TEAM_BINS_INDEX_URL, 0, function(ok, rec){
+    if(ok && rec && rec.index){ teamBinsIndex = rec.index; cb(true); }
+    else { if(!teamBinsIndex) teamBinsIndex = {}; cb(false); }
+  });
+}
+function ensureIndex(cb){ if(teamBinsIndex){ cb(true); return; } loadTeamIndex(cb); }
+function teamMonthKey(team, date){ return team + "|" + (date||'').slice(0,7); }
+function teamBinUrl(team, date){ var id = teamBinsIndex && teamBinsIndex[teamMonthKey(team,date)]; return id ? ("https://api.jsonbin.io/v3/b/"+id) : null; }
+function saveTeamIndex(cb){
+  cb = cb || function(){};
+  var x=new XMLHttpRequest(); x.open('PUT', TEAM_BINS_INDEX_URL, true);
+  x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); x.timeout=12000;
+  x.onload=function(){ cb(x.status>=200&&x.status<300); }; x.onerror=function(){cb(false);}; x.ontimeout=function(){cb(false);};
+  x.send(JSON.stringify({index: teamBinsIndex||{}}));
+}
+// 把一条记录 upsert 进指定班组bin（按日期去重），开版本控制
+function upsertToTeamBin(url, record, cb){
+  fetchBin(url, 0, function(ok, rec){
+    var list = (ok && rec && rec.records) ? rec.records.slice() : [];
+    var idx=-1; for(var i=0;i<list.length;i++){ if(list[i].date===record.date){ idx=i; break; } }
+    if(idx>=0) list[idx]=record; else list.push(record);
+    list.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+    var x=new XMLHttpRequest(); x.open('PUT', url, true);
+    x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); x.setRequestHeader('X-Bin-Versioning','true'); x.timeout=12000;
+    x.onload=function(){ cb(x.status>=200&&x.status<300); }; x.onerror=function(){cb(false);}; x.ontimeout=function(){cb(false);};
+    x.send(JSON.stringify({records:list}));
+  });
+}
+// 新建一个班组×月份 bin 并写入首条记录，回写索引
+function createTeamBin(key, record, cb){
+  var x=new XMLHttpRequest(); x.open('POST','https://api.jsonbin.io/v3/b',true);
+  x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key', JSONBIN_API_KEY);
+  x.setRequestHeader('X-Bin-Private','true'); x.setRequestHeader('X-Bin-Versioning','true');
+  x.setRequestHeader('X-Bin-Name', 'mohu-'+key.replace('|','-')); x.timeout=12000;
+  x.onload=function(){ if(x.status>=200&&x.status<300){ try{ var id=JSON.parse(x.responseText).metadata.id; cb(true,id); }catch(e){ cb(false); } } else cb(false); };
+  x.onerror=function(){cb(false);}; x.ontimeout=function(){cb(false);};
+  x.send(JSON.stringify({records:[record]}));
+}
+// 收集某组月份里所有已存在的班组bin url
+function collectTeamBinUrls(months){
+  var urls=[]; if(!teamBinsIndex) return urls;
+  months.forEach(function(mo){ TEAM_OPTIONS.forEach(function(team){ var id=teamBinsIndex[team+"|"+mo]; if(id){ var u="https://api.jsonbin.io/v3/b/"+id; if(urls.indexOf(u)<0) urls.push(u); } }); });
+  return urls;
+}
+// 全量：索引里所有班组bin（迁移后班组bin为权威账本，遗留主库/归档不再参与读取）
+function collectAllRecordUrls(){
+  var urls=[];
+  if(teamBinsIndex){ Object.keys(teamBinsIndex).forEach(function(k){ var u="https://api.jsonbin.io/v3/b/"+teamBinsIndex[k]; if(urls.indexOf(u)<0) urls.push(u); }); }
+  return urls;
+}
+
 // 拉取系统数据（按 team+date）
 function loadSysData(teamName, date, cb){
   fetchBin(SYSDATA_URL, 0, function(ok, rec){
@@ -618,49 +675,25 @@ function showCloudToast(msg, type, sticky){
 }
 
 function doUpload(record, attempt, isRetry){
-  var MAX=5;
+  var MAX=6;
   if (attempt>=MAX){ enqueue(record); if(!isRetry) showCloudToast("云端同步失败，将在后台重试","error"); return; }
-  var delay = Math.floor(Math.random()*2000)+500+attempt*1000;
+  var delay = Math.floor(Math.random()*1500)+400+attempt*1000;
   setTimeout(function(){
-    var xhr=new XMLHttpRequest();
-    xhr.open('GET', RECORDS_URL+'/latest', true);
-    xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY);
-    xhr.timeout=10000;
-    xhr.onload=function(){
-      if (xhr.status>=200 && xhr.status<300){
-        try{
-          var resp=JSON.parse(xhr.responseText); var data=resp.record||{}; var list=data.records||[];
-          var pruned=[];
-          // 滚动窗口：保留 30 天 + 体积护栏 <60KB（留大记录余量，避免逼近100KB写入失败）
-          var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30); var cut=cutoff.toISOString().slice(0,10);
-          var kept=[]; list.forEach(function(r){ if(!r.date || r.date>=cut) kept.push(r); else pruned.push(r); });
-          list=kept;
-          var guard=true; while(guard){ guard=false; if(JSON.stringify({records:list}).length>60000 && list.length>1){ pruned.push(list.shift()); guard=true; } }
-          var idx=-1; for(var i=0;i<list.length;i++){ if(list[i].teamName===record.teamName && list[i].date===record.date){ idx=i; break; } }
-          if(idx>=0) list[idx]=record; else list.push(record);
-          // 权威写入：先把这条记录写进当月归档 bin（按班组+日期去重合并），月 bin 成为完整账本
-          ingestRecordToMonthBin(record, function(monthOk){
-            // 安全顺序：先归档再裁剪。归档成功→PUT精简主库；归档失败且月账本也没写成→PUT完整主库（不丢数据，宁可逼近上限）
-            var doPutMain=function(trimmedList){
-              var xhr2=new XMLHttpRequest(); xhr2.open('PUT', RECORDS_URL, true);
-              xhr2.setRequestHeader('Content-Type','application/json'); xhr2.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr2.timeout=10000;
-              xhr2.onload=function(){ if(xhr2.status>=200&&xhr2.status<300){ verifyUpload(record,attempt,isRetry); } else doUpload(record,attempt+1,isRetry); };
-              xhr2.onerror=function(){ doUpload(record,attempt+1,isRetry); };
-              xhr2.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
-              xhr2.send(JSON.stringify({records:trimmedList}));
-            };
-            if(pruned.length){
-              archivePrunedRecords(pruned, function(archiveOk){
-                if(archiveOk || monthOk) doPutMain(list); else doPutMain(list.concat(pruned));
-              });
-            } else { doPutMain(list); }
-          });
-        }catch(e){ doUpload(record,attempt+1,isRetry); }
-      } else doUpload(record,attempt+1,isRetry);
-    };
-    xhr.onerror=function(){ doUpload(record,attempt+1,isRetry); };
-    xhr.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
-    xhr.send();
+    ensureIndex(function(idxOk){
+      if(!idxOk){ doUpload(record,attempt+1,isRetry); return; }
+      var key = teamMonthKey(record.teamName, record.date);
+      var url = teamBinUrl(record.teamName, record.date);
+      if(url){
+        upsertToTeamBin(url, record, function(success){
+          if(success) verifyUpload(record, attempt, isRetry); else doUpload(record,attempt+1,isRetry);
+        });
+      } else {
+        createTeamBin(key, record, function(created, newId){
+          if(created && newId){ teamBinsIndex[key]=newId; saveTeamIndex(function(){}); verifyUpload(record, attempt, isRetry); }
+          else doUpload(record,attempt+1,isRetry);
+        });
+      }
+    });
   }, delay);
 }
 function getArchiveUrls(monthKey){ return (ARCHIVE_BINS[monthKey]||[]).map(function(id){ return "https://api.jsonbin.io/v3/b/" + id; }); }
@@ -710,21 +743,13 @@ function ingestRecordToMonthBin(record, cb){
 }
 function verifyUpload(record, attempt, isRetry){
   setTimeout(function(){
-    var xhr=new XMLHttpRequest(); xhr.open('GET', RECORDS_URL+'/latest', true);
-    xhr.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr.timeout=10000;
-    xhr.onload=function(){
-      if (xhr.status>=200 && xhr.status<300){
-        try{
-          var list=(JSON.parse(xhr.responseText).record||{}).records||[];
-          var found=list.some(function(r){ return r.teamName===record.teamName && r.date===record.date && r.submitTime===record.submitTime; });
-          if(found){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); }
-          else doUpload(record,attempt+1,isRetry);
-        }catch(e){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); }
-      } else { dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); }
-    };
-    xhr.onerror=function(){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); };
-    xhr.ontimeout=function(){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); };
-    xhr.send();
+    var url = teamBinUrl(record.teamName, record.date) || RECORDS_URL;
+    fetchBin(url, 0, function(ok, rec){
+      var list=(ok&&rec&&rec.records)?rec.records:[];
+      var found=list.some(function(r){ return r.date===record.date && r.submitTime===record.submitTime; });
+      if(found){ dequeue(record); if(!isRetry) showCloudToast("云端同步完成","success"); }
+      else doUpload(record,attempt+1,isRetry);
+    });
   }, 800);
 }
 function uploadRecordToCloud(record){
@@ -1275,13 +1300,15 @@ function getViewMonths(){
 }
 function loadCloudForView(onDone,onError){
   cloudLoadError=false;
-  var urls=[]; getViewMonths().forEach(function(mo){ getArchiveUrls(mo).forEach(function(u){ if(urls.indexOf(u)<0) urls.push(u); }); });
-  var recs=null, sys=null, archMerged=[];
-  var pending=2+urls.length;
-  var done=function(){ pending--; if(pending===0){ if(recs && sys) onDone(mergeRecords(recs, archMerged), sys); else if(onError) onError(); } };
-  fetchBin(RECORDS_URL,0,function(ok,rec){ if(!ok){ cloudLoadError=true; recs=[]; } else { recs=((rec&&rec.records)||[]); } done(); });
-  fetchBin(SYSDATA_URL,150,function(ok,rec){ if(!ok) cloudLoadError=true; sys=ok?((rec&&rec.sysdata)||[]):[]; done(); });
-  urls.forEach(function(u,i){ fetchBin(u, 300+i*200, function(ok,rec){ if(ok) archMerged=mergeRecords(archMerged, ((rec&&rec.records)||[])); done(); }); });
+  ensureIndex(function(){
+    var months=getViewMonths();
+    var urls=collectTeamBinUrls(months);
+    var sys=null, merged=[];
+    var pending=1+urls.length;
+    var done=function(){ pending--; if(pending===0){ if(sys!=null) onDone(merged, sys); else if(onError) onError(); } };
+    fetchBin(SYSDATA_URL,0,function(ok,rec){ if(!ok) cloudLoadError=true; sys=ok?((rec&&rec.sysdata)||[]):[]; done(); });
+    urls.forEach(function(u,i){ fetchBin(u, 120+i*110, function(ok,rec){ if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); else cloudLoadError=true; done(); }); });
+  });
 }
 function setTimeFilter(dim){ dashboardTimeFilter=dim; var now=new Date(); if(dim==='day'){ var d=new Date(); d.setDate(d.getDate()-1); dashboardDateFilter=d.toISOString().split('T')[0]; } else if(dim==='week'){ dashboardDateFilter=getISOWeek(now.toISOString().split('T')[0]); } else { dashboardDateFilter=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,'0'); } document.querySelectorAll('.time-filter-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-param')===dim); }); renderDatePicker(); renderDashboard(); }
 function renderDatePicker(){
@@ -1502,7 +1529,12 @@ function showCloudData(){
   var m=document.createElement('div'); m.className='settings-modal'; m.style.cssText='width:90%;max-width:760px;max-height:82vh;overflow:hidden;display:flex;flex-direction:column;padding:0;';
   m.innerHTML='<div style="padding:20px 24px 16px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px">'+iconCloud('#059669')+'<span style="font-size:17px;font-weight:700;color:#111827">云端数据管理</span></div><button data-action="closeCloudData" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9CA3AF">&times;</button></div><div id="cloud-data-content" style="padding:20px 24px;overflow-y:auto;flex:1;font-size:13px;color:#6B7280">正在加载...</div>';
   ov.appendChild(m); document.body.appendChild(ov);
-  fetchBin(RECORDS_URL,0,function(ok,rec){ if(!ok){ document.getElementById('cloud-data-content').innerHTML='<div style="color:#DC2626">网络错误</div>'; return; } cloudRecordsCache=((rec&&rec.records)||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }); if(adminLoggedIn) showAdminPanel(); else renderCloudList(); });
+  ensureIndex(function(){
+    var urls=collectAllRecordUrls(); var merged=[]; var pending=urls.length;
+    var fin=function(){ pending--; if(pending>0) return; cloudRecordsCache=merged.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }); if(adminLoggedIn) showAdminPanel(); else renderCloudList(); };
+    if(!urls.length){ cloudRecordsCache=[]; renderCloudList(); return; }
+    urls.forEach(function(u,i){ fetchBin(u, i*100, function(ok,rec){ if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); fin(); }); });
+  });
 }
 function renderCloudList(){
   var c=document.getElementById('cloud-data-content'); if(!c) return;
@@ -1675,23 +1707,28 @@ function deleteCloudRecord(iStr){
   var i=parseInt(iStr,10); if(isNaN(i)||i<0||i>=cloudRecordsCache.length) return;
   var rec=cloudRecordsCache[i]; if(!confirm('确定删除 '+rec.teamName+' '+rec.date+' 的记录吗？')) return;
   var c=document.getElementById('cloud-data-content'); if(c) c.innerHTML='<div style="text-align:center;padding:40px 0">正在删除...</div>';
-  fetchBin(RECORDS_URL,0,function(ok,r){
-    if(!ok){ if(c) c.innerHTML='<div style="color:#DC2626">删除失败：无法访问云端</div>'; return; }
-    var list=((r&&r.records)||[]).filter(function(x){ return !(x.teamName===rec.teamName&&x.date===rec.date); });
-    var xhr=new XMLHttpRequest(); xhr.open('PUT',RECORDS_URL,true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key',JSONBIN_API_KEY); xhr.timeout=15000;
-    xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ cloudRecordsCache=cloudRecordsCache.filter(function(x){ return !(x.teamName===rec.teamName&&x.date===rec.date); }); showAdminPanel(); } else if(c) c.innerHTML='<div style="color:#DC2626">删除失败 HTTP '+xhr.status+'</div>'; };
-    xhr.onerror=function(){ if(c) c.innerHTML='<div style="color:#DC2626">删除失败：网络错误</div>'; };
-    xhr.send(JSON.stringify({records:list}));
+  ensureIndex(function(){
+    var url = teamBinUrl(rec.teamName, rec.date) || RECORDS_URL;
+    fetchBin(url,0,function(ok,r){
+      if(!ok){ if(c) c.innerHTML='<div style="color:#DC2626">删除失败：无法访问云端</div>'; return; }
+      var list=((r&&r.records)||[]).filter(function(x){ return !(x.date===rec.date); });
+      var xhr=new XMLHttpRequest(); xhr.open('PUT',url,true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key',JSONBIN_API_KEY); xhr.setRequestHeader('X-Bin-Versioning','true'); xhr.timeout=15000;
+      xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ cloudRecordsCache=cloudRecordsCache.filter(function(x){ return !(x.teamName===rec.teamName&&x.date===rec.date); }); showAdminPanel(); } else if(c) c.innerHTML='<div style="color:#DC2626">删除失败 HTTP '+xhr.status+'</div>'; };
+      xhr.onerror=function(){ if(c) c.innerHTML='<div style="color:#DC2626">删除失败：网络错误</div>'; };
+      xhr.send(JSON.stringify({records:list}));
+    });
   });
 }
 function clearAllCloudData(){
   if(!confirm('确定清空全部 '+cloudRecordsCache.length+' 条采集记录吗？不可恢复！')) return;
   if(!confirm('再次确认：清空后无法找回。')) return;
   var c=document.getElementById('cloud-data-content'); if(c) c.innerHTML='<div style="text-align:center;padding:40px 0">正在清空...</div>';
-  var xhr=new XMLHttpRequest(); xhr.open('PUT',RECORDS_URL,true); xhr.setRequestHeader('Content-Type','application/json'); xhr.setRequestHeader('X-Master-Key',JSONBIN_API_KEY); xhr.timeout=15000;
-  xhr.onload=function(){ if(xhr.status>=200&&xhr.status<300){ cloudRecordsCache=[]; cloudDashboardRecords=[]; if(c) c.innerHTML='<div style="text-align:center;padding:40px 0;color:#059669;font-weight:600">数据已清空</div>'; } else if(c) c.innerHTML='<div style="color:#DC2626">清空失败 HTTP '+xhr.status+'</div>'; };
-  xhr.onerror=function(){ if(c) c.innerHTML='<div style="color:#DC2626">清空失败：网络错误</div>'; };
-  xhr.send(JSON.stringify({records:[]}));
+  ensureIndex(function(){
+    var urls=collectAllRecordUrls(); var pending=urls.length; var fail=0;
+    if(!pending){ cloudRecordsCache=[]; cloudDashboardRecords=[]; if(c) c.innerHTML='<div style="text-align:center;padding:40px 0;color:#059669;font-weight:600">数据已清空</div>'; return; }
+    var fin=function(){ pending--; if(pending===0){ cloudRecordsCache=[]; cloudDashboardRecords=[]; if(fail&&c) c.innerHTML='<div style="color:#DC2626">部分清空失败('+fail+'个bin)</div>'; else if(c) c.innerHTML='<div style="text-align:center;padding:40px 0;color:#059669;font-weight:600">数据已清空</div>'; } };
+    urls.forEach(function(u,i){ var x=new XMLHttpRequest(); x.open('PUT',u,true); x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key',JSONBIN_API_KEY); x.timeout=15000; x.onload=function(){ if(x.status<200||x.status>=300) fail++; fin(); }; x.onerror=function(){ fail++; fin(); }; x.ontimeout=function(){ fail++; fin(); }; x.send(JSON.stringify({records:[]})); });
+  });
 }
 
 // ==================== XLSX EXPORT (20列，匹配分析表) ====================
@@ -1771,10 +1808,12 @@ function exportData(){
 }
 function exportAll(){
   var toast=showCloudToast('正在汇总全部数据（含历史归档）...','syncing',true);
-  var urls=[RECORDS_URL];
-  Object.keys(ARCHIVE_BINS).forEach(function(mo){ getArchiveUrls(mo).forEach(function(u){ if(urls.indexOf(u)<0) urls.push(u); }); });
-  var merged=[], pending=urls.length;
-  urls.forEach(function(u,i){ fetchBin(u, i*120, function(ok,rec){ if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); pending--; if(pending===0){ if(toast) toast.remove(); if(!merged.length){ alert('暂无数据可导出'); return; } exportTemplateXLSX(merged.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||TEAM_SORT.indexOf(a.teamName)-TEAM_SORT.indexOf(b.teamName); }), '模糊工时全量数据_'+new Date().toISOString().slice(0,10)+'.xlsx'); } }); });
+  ensureIndex(function(){
+    var urls=collectAllRecordUrls();
+    var merged=[], pending=urls.length;
+    if(!pending){ if(toast) toast.remove(); alert('暂无数据可导出'); return; }
+    urls.forEach(function(u,i){ fetchBin(u, i*110, function(ok,rec){ if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); pending--; if(pending===0){ if(toast) toast.remove(); if(!merged.length){ alert('暂无数据可导出'); return; } exportTemplateXLSX(merged.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||TEAM_SORT.indexOf(a.teamName)-TEAM_SORT.indexOf(b.teamName); }), '模糊工时全量数据_'+new Date().toISOString().slice(0,10)+'.xlsx'); } }); });
+  });
 }
 
 // ==================== ICONS ====================
