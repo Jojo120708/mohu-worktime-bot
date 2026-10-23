@@ -332,7 +332,7 @@ var SYSDATA_BIN_ID = "6aa35e7dac6210605abed9b4";   // 系统数据（不记产/�
 var RECORDS_URL = "https://api.jsonbin.io/v3/b/" + RECORDS_BIN_ID;
 var SYSDATA_URL = "https://api.jsonbin.io/v3/b/" + SYSDATA_BIN_ID;
 // 按班组×月份分bin（根除并发覆盖丢失）：索引bin 映射 "班组|YYYY-MM" → binId；每个班组每月一个独立bin，各课长只写自己的bin，互不覆盖
-var TEAM_BINS_INDEX_ID = "6adb2815ac6210605a4b66e0";
+var TEAM_BINS_INDEX_ID = "6adb5f6cac6210605a4bfe4f";
 var TEAM_BINS_INDEX_URL = "https://api.jsonbin.io/v3/b/" + TEAM_BINS_INDEX_ID;
 var teamBinsIndex = null; // 内存缓存 { "班组|YYYY-MM": "binId" }
 // 按月归档：主bin裁剪掉的旧记录按所属月份写入对应归档bin（每月2个，防单bin超100KB）
