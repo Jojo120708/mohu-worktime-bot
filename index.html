@@ -582,13 +582,14 @@ function fetchBin(url, delayMs, onDone){
 }
 
 // ==================== 按班组×月份分bin：路由与读写 ====================
+var teamIndexLoaded = false;
 function loadTeamIndex(cb){
   fetchBin(TEAM_BINS_INDEX_URL, 0, function(ok, rec){
-    if(ok && rec && rec.index){ teamBinsIndex = rec.index; cb(true); }
-    else { if(!teamBinsIndex) teamBinsIndex = {}; cb(false); }
+    if(ok && rec && rec.index){ teamBinsIndex = rec.index; teamIndexLoaded = true; cb(true); }
+    else { cb(false); } // 失败不缓存空索引，下次调用会重试
   });
 }
-function ensureIndex(cb){ if(teamBinsIndex){ cb(true); return; } loadTeamIndex(cb); }
+function ensureIndex(cb){ if(teamIndexLoaded && teamBinsIndex){ cb(true); return; } loadTeamIndex(cb); }
 function teamMonthKey(team, date){ return team + "|" + (date||'').slice(0,7); }
 function teamBinUrl(team, date){ var id = teamBinsIndex && teamBinsIndex[teamMonthKey(team,date)]; return id ? ("https://api.jsonbin.io/v3/b/"+id) : null; }
 function saveTeamIndex(cb){
@@ -1300,7 +1301,8 @@ function getViewMonths(){
 }
 function loadCloudForView(onDone,onError){
   cloudLoadError=false;
-  ensureIndex(function(){
+  ensureIndex(function(idxOk){
+    if(!idxOk) cloudLoadError=true;
     var months=getViewMonths();
     var urls=collectTeamBinUrls(months);
     var sys=null, merged=[];
