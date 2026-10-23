@@ -638,12 +638,20 @@ function doUpload(record, attempt, isRetry){
           var guard=true; while(guard){ guard=false; if(JSON.stringify({records:list}).length>60000 && list.length>1){ pruned.push(list.shift()); guard=true; } }
           var idx=-1; for(var i=0;i<list.length;i++){ if(list[i].teamName===record.teamName && list[i].date===record.date){ idx=i; break; } }
           if(idx>=0) list[idx]=record; else list.push(record);
-          var xhr2=new XMLHttpRequest(); xhr2.open('PUT', RECORDS_URL, true);
-          xhr2.setRequestHeader('Content-Type','application/json'); xhr2.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr2.timeout=10000;
-          xhr2.onload=function(){ if(xhr2.status>=200&&xhr2.status<300){ if(pruned.length) archivePrunedRecords(pruned); verifyUpload(record,attempt,isRetry); } else doUpload(record,attempt+1,isRetry); };
-          xhr2.onerror=function(){ doUpload(record,attempt+1,isRetry); };
-          xhr2.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
-          xhr2.send(JSON.stringify({records:list}));
+          // 安全顺序：先归档再裁剪。归档成功→PUT精简主库；归档失败→PUT完整主库（不丢数据，宁可逼近上限）
+          var doPutMain=function(trimmedList){
+            var xhr2=new XMLHttpRequest(); xhr2.open('PUT', RECORDS_URL, true);
+            xhr2.setRequestHeader('Content-Type','application/json'); xhr2.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); xhr2.timeout=10000;
+            xhr2.onload=function(){ if(xhr2.status>=200&&xhr2.status<300){ verifyUpload(record,attempt,isRetry); } else doUpload(record,attempt+1,isRetry); };
+            xhr2.onerror=function(){ doUpload(record,attempt+1,isRetry); };
+            xhr2.ontimeout=function(){ doUpload(record,attempt+1,isRetry); };
+            xhr2.send(JSON.stringify({records:trimmedList}));
+          };
+          if(pruned.length){
+            archivePrunedRecords(pruned, function(archiveOk){
+              if(archiveOk) doPutMain(list); else doPutMain(list.concat(pruned));
+            });
+          } else { doPutMain(list); }
         }catch(e){ doUpload(record,attempt+1,isRetry); }
       } else doUpload(record,attempt+1,isRetry);
     };
@@ -653,21 +661,28 @@ function doUpload(record, attempt, isRetry){
   }, delay);
 }
 function getArchiveUrls(monthKey){ return (ARCHIVE_BINS[monthKey]||[]).map(function(id){ return "https://api.jsonbin.io/v3/b/" + id; }); }
-function archivePrunedRecords(pruned){
-  if(!pruned || !pruned.length) return;
+function archivePrunedRecords(pruned, cb){
+  if(!pruned || !pruned.length){ if(cb) cb(true); return; }
   var byMonth={};
   pruned.forEach(function(r){ var mo=(r.date||"").slice(0,7); if(!/^\d{4}-\d{2}$/.test(mo) || !ARCHIVE_BINS[mo]) return; (byMonth[mo]=byMonth[mo]||[]).push(r); });
-  Object.keys(byMonth).forEach(function(mo){
+  var months=Object.keys(byMonth);
+  if(!months.length){ if(cb) cb(true); return; }
+  var totalOk=0;
+  months.forEach(function(mo){
     var urls=getArchiveUrls(mo); var existing=[]; var pending=urls.length;
     var finish=function(){
       existing=mergeRecords(existing, byMonth[mo]);
       existing.sort(function(a,b){ return (a.date||"").localeCompare(b.date||"") || (a.teamName||"").localeCompare(b.teamName||""); });
       var chunks=[[]]; var size=15;
       existing.forEach(function(r){ var rl=JSON.stringify(r).length+1; if(size+rl>90000 && chunks[chunks.length-1].length>0){ chunks.push([]); size=15; } chunks[chunks.length-1].push(r); size+=rl; });
-      chunks.forEach(function(chunk,ci){ if(ci>=urls.length){ console.warn("[Archive] "+mo+" capacity exceeded, dropped "+(chunks.length-urls.length)+" chunk(s)"); return; } var x=new XMLHttpRequest(); x.open('PUT', urls[ci], true); x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); x.timeout=15000; x.send(JSON.stringify({records:chunk})); });
+      var writePending=chunks.length; var writeOk=true;
+      var writeDone=function(){ writePending--; if(writePending<=0){ if(writeOk) totalOk++; if(totalOk>=months.length && cb) cb(true); else if(writePending<=0 && cb) cb(totalOk>0); } };
+      chunks.forEach(function(chunk,ci){ if(ci>=urls.length){ writeOk=false; writeDone(); return; } var x=new XMLHttpRequest(); x.open('PUT', urls[ci], true); x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); x.timeout=15000; x.onload=function(){ if(x.status<200||x.status>=300) writeOk=false; writeDone(); }; x.onerror=function(){ writeOk=false; writeDone(); }; x.ontimeout=function(){ writeOk=false; writeDone(); }; x.send(JSON.stringify({records:chunk})); });
       for(var ci2=chunks.length; ci2<urls.length; ci2++){ (function(url){ var x=new XMLHttpRequest(); x.open('PUT', url, true); x.setRequestHeader('Content-Type','application/json'); x.setRequestHeader('X-Master-Key', JSONBIN_API_KEY); x.timeout=15000; x.send(JSON.stringify({records:[]})); })(urls[ci2]); }
+      if(chunks.length===0){ totalOk++; if(totalOk>=months.length && cb) cb(true); }
     };
-    urls.forEach(function(url,i){ fetchBin(url, i*200, function(ok,rec){ if(ok) existing=mergeRecords(existing, ((rec&&rec.records)||[])); pending--; if(pending===0) finish(); }); });
+    var readFail=false;
+    urls.forEach(function(url,i){ fetchBin(url, i*200, function(ok,rec){ if(!ok) readFail=true; else existing=mergeRecords(existing, ((rec&&rec.records)||[])); pending--; if(pending===0) finish(); }); });
   });
 }
 function verifyUpload(record, attempt, isRetry){
