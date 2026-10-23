@@ -634,6 +634,20 @@ function collectAllRecordUrls(){
   if(teamBinsIndex){ Object.keys(teamBinsIndex).forEach(function(k){ var u="https://api.jsonbin.io/v3/b/"+teamBinsIndex[k]; if(urls.indexOf(u)<0) urls.push(u); }); }
   return urls;
 }
+// 串行读取多个 bin（本 JSONBin 免费账号并发会被限流静默丢数据，必须一个一个读）
+function fetchBinsSequential(urls, gapMs, cb){
+  var merged=[], anyFail=false, i=0;
+  var step=function(){
+    if(i>=urls.length){ cb(merged, anyFail); return; }
+    var u=urls[i++];
+    fetchBin(u, 0, function(ok, rec){
+      if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); else anyFail=true;
+      setTimeout(step, gapMs||100);
+    });
+  };
+  if(!urls.length){ cb([], false); return; }
+  step();
+}
 
 // 拉取系统数据（按 team+date）
 function loadSysData(teamName, date, cb){
@@ -1305,11 +1319,14 @@ function loadCloudForView(onDone,onError){
     if(!idxOk) cloudLoadError=true;
     var months=getViewMonths();
     var urls=collectTeamBinUrls(months);
-    var sys=null, merged=[];
-    var pending=1+urls.length;
-    var done=function(){ pending--; if(pending===0){ if(sys!=null) onDone(merged, sys); else if(onError) onError(); } };
-    fetchBin(SYSDATA_URL,0,function(ok,rec){ if(!ok) cloudLoadError=true; sys=ok?((rec&&rec.sysdata)||[]):[]; done(); });
-    urls.forEach(function(u,i){ fetchBin(u, 120+i*110, function(ok,rec){ if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); else cloudLoadError=true; done(); }); });
+    fetchBin(SYSDATA_URL,0,function(sysOk,sysRec){
+      if(!sysOk) cloudLoadError=true;
+      var sys=sysOk?((sysRec&&sysRec.sysdata)||[]):[];
+      fetchBinsSequential(urls, 80, function(merged, anyFail){
+        if(anyFail) cloudLoadError=true;
+        onDone(merged, sys);
+      });
+    });
   });
 }
 function setTimeFilter(dim){ dashboardTimeFilter=dim; var now=new Date(); if(dim==='day'){ var d=new Date(); d.setDate(d.getDate()-1); dashboardDateFilter=d.toISOString().split('T')[0]; } else if(dim==='week'){ dashboardDateFilter=getISOWeek(now.toISOString().split('T')[0]); } else { dashboardDateFilter=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,'0'); } document.querySelectorAll('.time-filter-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-param')===dim); }); renderDatePicker(); renderDashboard(); }
@@ -1532,10 +1549,11 @@ function showCloudData(){
   m.innerHTML='<div style="padding:20px 24px 16px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px">'+iconCloud('#059669')+'<span style="font-size:17px;font-weight:700;color:#111827">云端数据管理</span></div><button data-action="closeCloudData" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9CA3AF">&times;</button></div><div id="cloud-data-content" style="padding:20px 24px;overflow-y:auto;flex:1;font-size:13px;color:#6B7280">正在加载...</div>';
   ov.appendChild(m); document.body.appendChild(ov);
   ensureIndex(function(){
-    var urls=collectAllRecordUrls(); var merged=[]; var pending=urls.length;
-    var fin=function(){ pending--; if(pending>0) return; cloudRecordsCache=merged.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }); if(adminLoggedIn) showAdminPanel(); else renderCloudList(); };
-    if(!urls.length){ cloudRecordsCache=[]; renderCloudList(); return; }
-    urls.forEach(function(u,i){ fetchBin(u, i*100, function(ok,rec){ if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); fin(); }); });
+    var urls=collectAllRecordUrls();
+    fetchBinsSequential(urls, 80, function(merged){
+      cloudRecordsCache=merged.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+      if(adminLoggedIn) showAdminPanel(); else renderCloudList();
+    });
   });
 }
 function renderCloudList(){
@@ -1812,9 +1830,11 @@ function exportAll(){
   var toast=showCloudToast('正在汇总全部数据（含历史归档）...','syncing',true);
   ensureIndex(function(){
     var urls=collectAllRecordUrls();
-    var merged=[], pending=urls.length;
-    if(!pending){ if(toast) toast.remove(); alert('暂无数据可导出'); return; }
-    urls.forEach(function(u,i){ fetchBin(u, i*110, function(ok,rec){ if(ok) merged=mergeRecords(merged, ((rec&&rec.records)||[])); pending--; if(pending===0){ if(toast) toast.remove(); if(!merged.length){ alert('暂无数据可导出'); return; } exportTemplateXLSX(merged.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||TEAM_SORT.indexOf(a.teamName)-TEAM_SORT.indexOf(b.teamName); }), '模糊工时全量数据_'+new Date().toISOString().slice(0,10)+'.xlsx'); } }); });
+    fetchBinsSequential(urls, 80, function(merged, anyFail){
+      if(toast) toast.remove();
+      if(!merged.length){ alert(anyFail?'云端读取失败，请稍后重试':'暂无数据可导出'); return; }
+      exportTemplateXLSX(merged.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||TEAM_SORT.indexOf(a.teamName)-TEAM_SORT.indexOf(b.teamName); }), '模糊工时全量数据_'+new Date().toISOString().slice(0,10)+'.xlsx');
+    });
   });
 }
 
