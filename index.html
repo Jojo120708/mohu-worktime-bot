@@ -534,6 +534,11 @@ function formatDateShort(ds){ var d=new Date(ds); return (d.getMonth()+1)+"月"+
 })();
 function saveRecords(){ if(!storageAvailable) return; try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); }catch(e){} }
 
+// 看板数据本地缓存：打开秒显上次数据，后台再串行拉最新（免费账号并发受限只能串行，故慢；缓存消除等待感）
+var DASH_CACHE_KEY = "mohuDashCache";
+function saveDashCache(recs, sys){ if(!storageAvailable) return; try{ localStorage.setItem(DASH_CACHE_KEY, JSON.stringify({t:Date.now(), records:recs, sys:sys})); }catch(e){} }
+function loadDashCache(){ if(!storageAvailable) return null; try{ var s=localStorage.getItem(DASH_CACHE_KEY); if(!s) return null; var o=JSON.parse(s); if(o && Array.isArray(o.records)) return o; }catch(e){} return null; }
+
 // ==================== DINGTALK ====================
 var isDingTalkEnv = false;
 (function initDingTalk(){
@@ -1299,8 +1304,10 @@ function showDashboard(){
   document.getElementById("dashboard").classList.remove("hidden");
   document.querySelectorAll('.time-filter-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-param')===dashboardTimeFilter); });
   renderDatePicker();
-  document.getElementById("dashboard-sub").textContent='正在加载云端数据...';
-  loadCloudForView(function(recs, sys){ cloudDashboardRecords=recs; sysDataAll=sys; renderDashboard(); }, function(){ document.getElementById("dashboard-sub").textContent='网络错误，无法加载云端数据'; });
+  var cached=loadDashCache();
+  if(cached){ cloudDashboardRecords=cached.records; sysDataAll=cached.sys||[]; renderDashboard(); document.getElementById("dashboard-sub").textContent='已显示上次数据（'+new Date(cached.t).toLocaleTimeString()+'），正在后台刷新…'; }
+  else document.getElementById("dashboard-sub").textContent='正在加载云端数据…';
+  loadCloudForView(function(recs, sys){ cloudDashboardRecords=recs; sysDataAll=sys; saveDashCache(recs, sys); renderDashboard(); }, function(){ if(!cached) document.getElementById("dashboard-sub").textContent='网络错误，无法加载云端数据'; });
 }
 function getViewMonths(){
   var base=null;
