@@ -45,12 +45,9 @@ const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
 
 async function listKeys(store, prefix) {
   const all = [];
-  let cursor;
-  do {
-    const page = await store.list({ prefix: prefix, pageSize: 1000, cursor: cursor });
+  for await (const page of store.list({ prefix: prefix, paginate: true })) {
     (page.blobs || []).forEach(b => all.push(b.key));
-    cursor = page.hasMore ? page.cursor : null;
-  } while (cursor);
+  }
   return all;
 }
 
