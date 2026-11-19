@@ -493,6 +493,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   setTimeout(function(){ retryPendingUploads(); }, 3000);
+  setTimeout(checkBackend, 400);
 });
 
 // ==================== HELPERS ====================
@@ -569,6 +570,27 @@ function apiReq(method, qs, body, cb){
 }
 function apiGet(qs, cb){ apiReq('GET', qs, null, cb); }
 function apiPost(qs, body, cb){ apiReq('POST', qs, body, cb); }
+
+// 后端自检：GitHub Pages 预览地址没有函数运行环境，必须明确告诉用户改用哪个链接
+function checkBackend(){
+  apiGet('op=ping', function(ok, resp){
+    if (ok) return;
+    var host = String(location.hostname || '');
+    var code = (resp && resp.httpError) ? resp.httpError : '网络错误';
+    var msg;
+    if (/github\.io$/i.test(host)) {
+      msg = '这个地址（GitHub Pages）只有页面、没有后端接口，无法提交也无法查看云端数据。请改用 Netlify 的部署预览地址（形如 https://deploy-xxxx--wonderful-cranachan-a50a3d.netlify.app/），向 QwenWork 索取最新链接。';
+    } else {
+      msg = '后端接口不可用（' + code + '），暂时不能提交或查看云端数据。请稍等后点右上角「刷新」重试；若持续失败，请联系管理员。';
+    }
+    if (document.getElementById('backend-error')) return;
+    var bar = document.createElement('div');
+    bar.id = 'backend-error';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10001;background:#FEF2F2;border-bottom:2px solid #DC2626;color:#991B1B;padding:12px 16px;font-size:13px;font-weight:600;line-height:1.6;text-align:center;';
+    bar.textContent = '⚠ ' + msg;
+    document.body.appendChild(bar);
+  });
+}
 
 // 兼容层：所有调用点仍然走 fetchBin(url, delay, cb)，url 换成内部标记
 function fetchBin(url, delayMs, onDone){
