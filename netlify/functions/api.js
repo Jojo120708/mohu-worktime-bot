@@ -4,12 +4,29 @@ const TEAMS = ['一部一课', '一部二课', '一部三课', '二部一课', '
 const TOKEN = process.env.MOHU_TOKEN || 'f01caa8b04fdeb4a5e35f014';
 const SYS_KEY = 'meta/sysdata';
 const META_KEY = 'meta/info';
+// 生产 store 只允许由「明确的生产域名」进入；识别不出的上下文一律落到隔离 store 并拒绝写入，
+// 防止 Netlify 预览部署（共享站点级 store）把生产数据改掉。
+const PROD_STORE = 'mohu';
+const PROD_HOSTS = ['wonderful-cranachan-a50a3d.netlify.app'];
+const UNRESOLVED = 'mohu-unresolved';
+
+function resolveStore(req) {
+  const raw = String(req.headers.get('host') || '');
+  const host = raw.toLowerCase().split(':')[0];
+  if (process.env.MOHU_STORE) return { name: process.env.MOHU_STORE, writable: true, how: 'env' };
+  if (!host) return { name: UNRESOLVED, writable: false, how: 'no-host' };
+  if (/^(localhost|127\.|0\.0\.0\.0|.*\.local)$/.test(host)) return { name: 'mohu-local', writable: true, how: 'local' };
+  const isPreview = host.indexOf('--') >= 0 || /^deploy-[a-z0-9]+/.test(host) || /\.deploy\./.test(host);
+  if (isPreview) return { name: 'mohu-preview', writable: true, how: 'preview' };
+  if (PROD_HOSTS.indexOf(host) >= 0) return { name: PROD_STORE, writable: true, how: 'prod-list' };
+  if (/\.netlify\.app$/.test(host)) return { name: PROD_STORE, writable: true, how: 'netlify-app' };
+  return { name: UNRESOLVED, writable: false, how: 'unknown-host:' + host.slice(0, 40) };
+}
 
 function pickStore(req) {
-  const host = String(req.headers.get('host') || '').toLowerCase();
-  const isPreview = /--/.test(host) || host.startsWith('deploy-') || /\.deploy\./.test(host);
-  const name = process.env.MOHU_STORE || (isPreview ? 'mohu-preview' : 'mohu');
-  return { name: name, store: getStore({ name: name, consistency: 'strong' }) };
+  const r = resolveStore(req);
+  r.store = getStore({ name: r.name, consistency: 'strong' });
+  return r;
 }
 
 function json(body, status) {
@@ -61,10 +78,13 @@ export default async function (req, context) {
   const picked = pickStore(req);
   const store = picked.store;
   const adminOk = String(req.headers.get('x-mohu-token') || '') === TOKEN;
+  if (req.method === 'POST' && !picked.writable) {
+    return json({ ok: false, error: 'store_unresolved', how: picked.how, store: picked.name }, 403);
+  }
 
   try {
     if (op === 'ping') {
-      return json({ ok: true, store: picked.name, time: new Date().toISOString() });
+      return json({ ok: true, store: picked.name, how: picked.how, writable: picked.writable, time: new Date().toISOString() });
     }
 
     if (op === 'records') {
